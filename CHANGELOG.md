@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/aself101/kenpom-api/compare/v1.0.0...v1.0.1) (2025-11-23)
+
+
+### Bug Fixes
+
+* **docs:** add responsible use disclaimer to README ([9ba06e3](https://github.com/aself101/kenpom-api/commit/9ba06e314b736fa07e0fd282aa00568fbd16f815))
+
 # 1.0.0 (2025-11-23)
 
 
