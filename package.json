@@ -1,0 +1,69 @@
+{
+  "name": "kenpom-api",
+  "version": "1.0.0",
+  "description": "KenPom.com API wrapper - College basketball statistics for Node.js with CLI",
+  "main": "api.js",
+  "type": "module",
+  "bin": {
+    "kenpom": "cli.js"
+  },
+  "exports": {
+    ".": "./api.js",
+    "./api": "./api.js",
+    "./utils": "./utils.js",
+    "./config": "./config.js",
+    "./parsers": "./parsers.js"
+  },
+  "files": [
+    "api.js",
+    "cli.js",
+    "utils.js",
+    "config.js",
+    "parsers.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "kenpom": "node cli.js",
+    "kenpom:help": "node cli.js --help",
+    "kenpom:ratings": "node cli.js --ratings",
+    "kenpom:efficiency": "node cli.js --efficiency",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "kenpom",
+    "college-basketball",
+    "ncaa",
+    "basketball",
+    "statistics",
+    "sports-data",
+    "scraper",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "cloudscraper": "^4.6.0",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.6",
+    "@vitest/coverage-v8": "^4.0.10",
+    "semantic-release": "^24.2.9",
+    "vitest": "^4.0.10"
+  },
+  "optionalDependencies": {
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

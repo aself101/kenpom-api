@@ -1,0 +1,55 @@
+# Test files
+test/
+*.test.js
+coverage/
+.nyc_output/
+
+
+tsconfig.json
+jest.config.js
+.releaserc.json
+.eslintrc.js
+.prettierrc
+
+# Development files
+.env
+.env.*
+.env.example
+vitest.config.js
+
+# Output directories
+datasets/
+test-output/
+test-api-output/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git files
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+
+# Documentation (keep README.md, LICENSE, CHANGELOG.md)
+docs/
+
+# Build artifacts
+node_modules/
+
+# release
+.releaserc.json
