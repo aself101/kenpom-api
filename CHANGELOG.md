@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Conference Standings, Offense, Defense, and Stats
 
 - **Tiered HTTP Client** with automatic fallback:
-  - Tier 1: cloudscraper for Cloudflare bypass
-  - Tier 2: puppeteer-extra with stealth plugin (optional)
+  - Tier 1: Lightweight HTTP client for Cloudflare bypass
+  - Tier 2: Headless browser with stealth plugin (optional)
 
 - **CLI Tool** (`kenpom` command) with:
   - Individual endpoint flags (--ratings, --efficiency, etc.)

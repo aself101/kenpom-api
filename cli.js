@@ -113,7 +113,7 @@ program
 program
   .option('--output-dir <path>', 'Output directory', DEFAULT_DATA_DIR)
   .option('--log-level <level>', 'Log level (DEBUG, INFO, WARNING, ERROR)', 'INFO')
-  .option('--client <tier>', 'HTTP client tier (cloudscraper, puppeteer, auto)', 'auto')
+  .option('--client <tier>', 'HTTP client tier (tier1, tier2, auto)', 'auto')
   .option('--dry-run', 'Preview what would be fetched')
   .option('--examples', 'Show usage examples');
 
@@ -163,8 +163,8 @@ kenpom --fanmatch --year 2025
 # Dry run to preview
 kenpom --all --year 2025 --dry-run
 
-# Use specific HTTP client
-kenpom --ratings --year 2025 --client puppeteer
+# Use specific HTTP client tier
+kenpom --ratings --year 2025 --client tier2
 
 Valid Metrics:
   Player Stats: ${PLAYER_METRICS.join(', ')}

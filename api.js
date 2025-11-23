@@ -5,8 +5,8 @@
  * Provides methods for fetching ratings, efficiency stats, player stats, and more.
  *
  * Uses a tiered HTTP client approach:
- * - Tier 1: cloudscraper (handles Cloudflare protection)
- * - Tier 2: puppeteer with stealth (most reliable, heavier)
+ * - Tier 1: Lightweight HTTP client (handles Cloudflare protection)
+ * - Tier 2: Headless browser with stealth (most reliable, heavier)
  *
  * @example
  * const api = new KenpomAPI();
@@ -73,7 +73,7 @@ export class KenpomAPI {
    * @param {string} options.email - KenPom email. If null, reads from environment.
    * @param {string} options.password - KenPom password. If null, reads from environment.
    * @param {string} options.logLevel - Logging level (DEBUG, INFO, WARNING, ERROR, NONE)
-   * @param {string} options.clientTier - Force specific client tier ('cloudscraper', 'puppeteer', or 'auto')
+   * @param {string} options.clientTier - Force specific client tier ('tier1', 'tier2', or 'auto')
    */
   constructor({ email = null, password = null, logLevel = 'INFO', clientTier = 'auto' } = {}) {
     // Setup logging
@@ -114,26 +114,38 @@ export class KenpomAPI {
   /**
    * Login to KenPom.com with tiered client approach.
    *
-   * Tries clients in order: cloudscraper → puppeteer
+   * Tries clients in order: tier1 (lightweight) → tier2 (headless browser)
    * Stops when login succeeds.
    *
    * @throws {Error} If all login attempts fail
    */
   async login() {
-    const tiers = this.clientTier === 'auto'
-      ? ['cloudscraper', 'puppeteer']
-      : [this.clientTier];
+    // Map legacy client tier names to new names
+    const tierMap = {
+      'cloudscraper': 'tier1',
+      'puppeteer': 'tier2',
+      'tier1': 'tier1',
+      'tier2': 'tier2',
+      'auto': 'auto'
+    };
+    const normalizedTier = tierMap[this.clientTier] || this.clientTier;
+
+    const tiers = normalizedTier === 'auto'
+      ? ['tier1', 'tier2']
+      : [normalizedTier];
 
     let lastError = null;
 
     for (const tier of tiers) {
       try {
-        this.logger.info(`Attempting login with ${tier} client...`);
+        const tierLabel = tier === 'tier1' ? 'Tier 1 (lightweight)' : 'Tier 2 (headless browser)';
+        this.logger.info(`Attempting login with ${tierLabel}...`);
         await this._loginWithTier(tier);
-        this.logger.info(`Successfully logged in with ${tier} client`);
+        this.logger.info(`Successfully logged in with ${tierLabel}`);
         return;
       } catch (error) {
-        this.logger.warn(`Login with ${tier} failed: ${error.message}`);
+        const tierLabel = tier === 'tier1' ? 'Tier 1' : 'Tier 2';
+        this.logger.warn(`Login with ${tierLabel} failed: ${error.message}`);
         lastError = error;
 
         // Clean up failed client
@@ -150,16 +162,16 @@ export class KenpomAPI {
   /**
    * Login with a specific client tier.
    *
-   * @param {string} tier - 'cloudscraper' or 'puppeteer'
+   * @param {string} tier - 'tier1' or 'tier2'
    * @private
    */
   async _loginWithTier(tier) {
     switch (tier) {
-      case 'cloudscraper':
-        await this._loginWithCloudscraper();
+      case 'tier1':
+        await this._loginWithTier1();
         break;
-      case 'puppeteer':
-        await this._loginWithPuppeteer();
+      case 'tier2':
+        await this._loginWithTier2();
         break;
       default:
         throw new Error(`Unknown client tier: ${tier}`);
@@ -167,19 +179,19 @@ export class KenpomAPI {
   }
 
   /**
-   * Login using cloudscraper for Cloudflare bypass.
+   * Login using Tier 1 lightweight HTTP client for Cloudflare bypass.
    * @private
    */
-  async _loginWithCloudscraper() {
+  async _loginWithTier1() {
     const { client } = await createCloudscraperClient();
-    this.clientType = 'cloudscraper';
+    this.clientType = 'tier1';
 
-    // Create cloudscraper session
+    // Create HTTP session
     const session = client.create_scraper ? client.create_scraper() : client;
     this.client = session;
 
     // Step 1: GET initial page
-    this.logger.debug('Fetching initial page with cloudscraper...');
+    this.logger.debug('Fetching initial page...');
     await new Promise((resolve, reject) => {
       session.get(`${BASE_URL}/index.php`, (err, response, body) => {
         if (err) reject(err);
@@ -209,13 +221,13 @@ export class KenpomAPI {
   }
 
   /**
-   * Login using puppeteer with stealth (Tier 3).
+   * Login using Tier 2 headless browser with stealth.
    * @private
    */
-  async _loginWithPuppeteer() {
+  async _loginWithTier2() {
     const { browser, page, close } = await createPuppeteerClient();
     this.client = { browser, page };
-    this.clientType = 'puppeteer';
+    this.clientType = 'tier2';
     this._closePuppeteer = close;
 
     // Step 1: Navigate to homepage
@@ -274,7 +286,7 @@ export class KenpomAPI {
    * @private
    */
   async _getHtml(url) {
-    if (this.clientType === 'cloudscraper') {
+    if (this.clientType === 'tier1') {
       return new Promise((resolve, reject) => {
         this.client.get(url, (err, response, body) => {
           if (err) reject(err);
@@ -283,7 +295,7 @@ export class KenpomAPI {
       });
     }
 
-    if (this.clientType === 'puppeteer') {
+    if (this.clientType === 'tier2') {
       await this.client.page.goto(url, { waitUntil: 'networkidle2' });
       return await this.client.page.content();
     }
@@ -295,7 +307,7 @@ export class KenpomAPI {
    * Close the client connection.
    */
   async close() {
-    if (this.clientType === 'puppeteer' && this._closePuppeteer) {
+    if (this.clientType === 'tier2' && this._closePuppeteer) {
       await this._closePuppeteer();
     }
     this.client = null;

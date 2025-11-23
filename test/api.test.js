@@ -82,8 +82,8 @@ describe('KenpomAPI', () => {
     });
 
     it('should accept custom client tier', () => {
-      const instance = new KenpomAPI({ clientTier: 'cloudscraper', logLevel: 'NONE' });
-      expect(instance.clientTier).toBe('cloudscraper');
+      const instance = new KenpomAPI({ clientTier: 'tier1', logLevel: 'NONE' });
+      expect(instance.clientTier).toBe('tier1');
     });
 
     it('should accept custom log level', () => {
@@ -116,12 +116,12 @@ describe('KenpomAPI', () => {
   });
 
   describe('_getHtml', () => {
-    it('should fetch with cloudscraper client', async () => {
+    it('should fetch with tier1 client', async () => {
       const mockGet = vi.fn((url, callback) => {
         callback(null, {}, '<html>test</html>');
       });
       api.client = { get: mockGet };
-      api.clientType = 'cloudscraper';
+      api.clientType = 'tier1';
 
       const html = await api._getHtml('https://kenpom.com/test');
 
@@ -129,28 +129,28 @@ describe('KenpomAPI', () => {
       expect(html).toBe('<html>test</html>');
     });
 
-    it('should handle cloudscraper errors', async () => {
+    it('should handle tier1 errors', async () => {
       const mockGet = vi.fn((url, callback) => {
         callback(new Error('Network error'), null, null);
       });
       api.client = { get: mockGet };
-      api.clientType = 'cloudscraper';
+      api.clientType = 'tier1';
 
       await expect(api._getHtml('https://kenpom.com/test')).rejects.toThrow('Network error');
     });
 
-    it('should fetch with puppeteer client', async () => {
+    it('should fetch with tier2 client', async () => {
       const mockPage = {
         goto: vi.fn(),
-        content: vi.fn().mockResolvedValue('<html>puppeteer</html>'),
+        content: vi.fn().mockResolvedValue('<html>tier2</html>'),
       };
       api.client = { page: mockPage };
-      api.clientType = 'puppeteer';
+      api.clientType = 'tier2';
 
       const html = await api._getHtml('https://kenpom.com/test');
 
       expect(mockPage.goto).toHaveBeenCalledWith('https://kenpom.com/test', { waitUntil: 'networkidle2' });
-      expect(html).toBe('<html>puppeteer</html>');
+      expect(html).toBe('<html>tier2</html>');
     });
 
     it('should throw for unknown client type', async () => {
@@ -186,7 +186,7 @@ describe('KenpomAPI', () => {
 
       expect(createCloudscraperClient).toHaveBeenCalled();
       expect(createPuppeteerClient).toHaveBeenCalled();
-      expect(api.clientType).toBe('puppeteer');
+      expect(api.clientType).toBe('tier2');
       expect(api.isLoggedIn).toBe(true);
     });
 
@@ -206,11 +206,11 @@ describe('KenpomAPI', () => {
         close: vi.fn(),
       });
 
-      const instance = new KenpomAPI({ clientTier: 'puppeteer', logLevel: 'NONE' });
+      const instance = new KenpomAPI({ clientTier: 'tier2', logLevel: 'NONE' });
       await instance.login();
 
       expect(createPuppeteerClient).toHaveBeenCalled();
-      expect(instance.clientType).toBe('puppeteer');
+      expect(instance.clientType).toBe('tier2');
     });
 
     it('should throw if all tiers fail', async () => {
@@ -230,10 +230,10 @@ describe('KenpomAPI', () => {
   });
 
   describe('close', () => {
-    it('should close puppeteer client', async () => {
+    it('should close tier2 client', async () => {
       const mockClose = vi.fn();
       api.client = {};
-      api.clientType = 'puppeteer';
+      api.clientType = 'tier2';
       api._closePuppeteer = mockClose;
       api.isLoggedIn = true;
 
@@ -244,9 +244,9 @@ describe('KenpomAPI', () => {
       expect(api.isLoggedIn).toBe(false);
     });
 
-    it('should handle non-puppeteer clients', async () => {
+    it('should handle tier1 clients', async () => {
       api.client = {};
-      api.clientType = 'cloudscraper';
+      api.clientType = 'tier1';
       api.isLoggedIn = true;
 
       await api.close();
@@ -264,7 +264,7 @@ describe('KenpomAPI', () => {
           callback(null, {}, '<html><table></table></html>');
         }),
       };
-      api.clientType = 'cloudscraper';
+      api.clientType = 'tier1';
       api.isLoggedIn = true;
     });
 
