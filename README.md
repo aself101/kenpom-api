@@ -944,6 +944,17 @@ This package is part of the data-collection ecosystem. Check out these other spo
 
 **Disclaimer:** This project is an independent community wrapper and is not affiliated with KenPom.com. Please respect KenPom.com's terms of service and rate limits. A valid KenPom subscription is required.
 
+### Responsible Use
+
+This package includes built-in rate limiting (2-7 second delays between requests), but users are ultimately responsible for how they use this tool. Please:
+
+- **Respect rate limits** - Avoid excessive requests that could burden the server
+- **Use reasonably** - Fetch only the data you need, when you need it
+- **Cache appropriately** - Store fetched data locally rather than re-fetching repeatedly
+- **Follow terms of service** - Comply with KenPom.com's usage policies
+
+Abuse of this package (e.g., excessive scraping, circumventing access controls) may result in your account being suspended or banned from KenPom.com. The maintainers of this package are not responsible for any consequences arising from misuse.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
