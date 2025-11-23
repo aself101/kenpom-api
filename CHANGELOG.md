@@ -1,3 +1,10 @@
+# 1.0.0 (2025-11-23)
+
+
+### Features
+
+* initial release of kenpom-api v1.0.0 ([80d1a67](https://github.com/aself101/kenpom-api/commit/80d1a67267f1f1e406bdbc5fdad1a5977cc6ad1a))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
