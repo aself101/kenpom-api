@@ -953,7 +953,7 @@ This package includes built-in rate limiting (2-7 second delays between requests
 - **Cache appropriately** - Store fetched data locally rather than re-fetching repeatedly
 - **Follow terms of service** - Comply with KenPom.com's usage policies
 
-Abuse of this package (e.g., excessive scraping, circumventing access controls) may result in your account being suspended or banned from KenPom.com. The maintainers of this package are not responsible for any consequences arising from misuse.
+Abuse of this package (e.g., excessive scraping, circumventing access controls) may result in your account being suspended or banned from KenPom.com. The maintainers of this package are not responsible for any consequences arising from misuse. Let's try and be decent with this.
 
 ## License
 
