@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/aself101/kenpom-api/compare/v1.0.2...v1.0.3) (2025-11-27)
+
+
+### Bug Fixes
+
+* **ci:** require Node 20.18+ for cheerio/undici compatibility ([9b0ba53](https://github.com/aself101/kenpom-api/commit/9b0ba537485675095ce1201d64d123581a5614e1))
+
 ## [1.0.2](https://github.com/aself101/kenpom-api/compare/v1.0.1...v1.0.2) (2025-11-27)
 
 
