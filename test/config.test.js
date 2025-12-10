@@ -17,7 +17,7 @@ import {
   validateConference,
   encodeTeamName,
   buildUrl,
-} from '../config.js';
+} from '../dist/config.js';
 
 describe('config', () => {
   describe('constants', () => {

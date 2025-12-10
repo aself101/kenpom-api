@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/node/v/kenpom-api)](https://nodejs.org)
 [![Tests](https://img.shields.io/badge/tests-203%20passing-brightgreen)](test/)
-[![Coverage](https://img.shields.io/badge/coverage-82.04%25-brightgreen)](test/)
+[![Coverage](https://img.shields.io/badge/coverage-86.01%25-brightgreen)](test/)
 
 A Node.js wrapper for [KenPom.com](https://kenpom.com/) college basketball statistics with CLI support. Scrapes data from KenPom using authenticated HTTP requests with automatic Cloudflare bypass.
 

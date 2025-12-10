@@ -6,9 +6,22 @@
  */
 
 import * as cheerio from 'cheerio';
+
+// Cheerio types - extract from cheerio module
+type CheerioAPI = ReturnType<typeof cheerio.load>;
+type CheerioElement = ReturnType<CheerioAPI>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CheerioNode = any;
 import fs from 'fs';
 import path from 'path';
 import { DEFAULT_HEADERS } from './config.js';
+import type {
+  TableRow,
+  FileFormat,
+  SpinnerControl,
+  CloudscraperClient,
+  PuppeteerClient,
+} from './types.js';
 
 // ============================================================================
 // HTML TABLE PARSING
@@ -18,12 +31,16 @@ import { DEFAULT_HEADERS } from './config.js';
  * Parse an HTML table into an array of objects.
  * Similar to pandas read_html() functionality.
  *
- * @param {string} html - HTML content containing the table
- * @param {string} selector - CSS selector for the table (default: 'table')
- * @param {number} tableIndex - Index of table if multiple match (default: 0)
- * @returns {Array<Object>} Array of row objects with column names as keys
+ * @param html - HTML content containing the table
+ * @param selector - CSS selector for the table (default: 'table')
+ * @param tableIndex - Index of table if multiple match (default: 0)
+ * @returns Array of row objects with column names as keys
  */
-export function parseTable(html, selector = 'table', tableIndex = 0) {
+export function parseTable(
+  html: string,
+  selector: string = 'table',
+  tableIndex: number = 0
+): TableRow[] {
   const $ = cheerio.load(html);
   const tables = $(selector);
 
@@ -42,17 +59,20 @@ export function parseTable(html, selector = 'table', tableIndex = 0) {
 /**
  * Parse a cheerio table element into an array of objects.
  *
- * @param {CheerioAPI} $ - Cheerio instance
- * @param {Cheerio} table - Cheerio table element
- * @returns {Array<Object>} Array of row objects
+ * @param $ - Cheerio instance
+ * @param table - Cheerio table element
+ * @returns Array of row objects
  */
-export function parseTableElement($, table) {
-  const headers = [];
-  const rows = [];
+export function parseTableElement(
+  $: CheerioAPI,
+  table: CheerioElement
+): TableRow[] {
+  const headers: string[] = [];
+  const rows: TableRow[] = [];
 
   // Extract headers from thead or first row
   const thead = table.find('thead');
-  let headerRow;
+  let headerRow: CheerioElement;
 
   if (thead.length > 0) {
     headerRow = thead.find('tr').last();
@@ -60,7 +80,7 @@ export function parseTableElement($, table) {
     headerRow = table.find('tr').first();
   }
 
-  headerRow.find('th, td').each((i, el) => {
+  headerRow.find('th, td').each((i: number, el: CheerioNode) => {
     let text = $(el).text().trim();
     // Handle empty headers
     if (!text) text = `Column${i}`;
@@ -75,12 +95,15 @@ export function parseTableElement($, table) {
   const tbody = table.find('tbody');
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
-  bodyRows.each((i, row) => {
-    const rowData = {};
-    $(row).find('td').each((j, cell) => {
+  bodyRows.each((_i: number, row: CheerioNode) => {
+    const rowData: TableRow = {};
+    $(row).find('td').each((j: number, cell: CheerioNode) => {
       if (j < headers.length) {
         const text = $(cell).text().trim();
-        rowData[headers[j]] = text;
+        const header = headers[j];
+        if (header !== undefined) {
+          rowData[header] = text;
+        }
       }
     });
 
@@ -96,19 +119,22 @@ export function parseTableElement($, table) {
 /**
  * Parse all tables from HTML content.
  *
- * @param {string} html - HTML content
- * @param {string} selector - CSS selector for tables
- * @returns {Array<Array<Object>>} Array of parsed tables
+ * @param html - HTML content
+ * @param selector - CSS selector for tables
+ * @returns Array of parsed tables
  */
-export function parseAllTables(html, selector = 'table') {
+export function parseAllTables(
+  html: string,
+  selector: string = 'table'
+): TableRow[][] {
   const $ = cheerio.load(html);
   const tables = $(selector);
-  const results = [];
+  const results: TableRow[][] = [];
 
   tables.each((i, table) => {
     try {
       results.push(parseTableElement($, $(table)));
-    } catch (e) {
+    } catch {
       // Skip unparseable tables
     }
   });
@@ -119,11 +145,11 @@ export function parseAllTables(html, selector = 'table') {
 /**
  * Extract text content from HTML using CSS selector.
  *
- * @param {string} html - HTML content
- * @param {string} selector - CSS selector
- * @returns {string|null} Text content or null if not found
+ * @param html - HTML content
+ * @param selector - CSS selector
+ * @returns Text content or null if not found
  */
-export function extractText(html, selector) {
+export function extractText(html: string, selector: string): string | null {
   const $ = cheerio.load(html);
   const element = $(selector);
   return element.length > 0 ? element.text().trim() : null;
@@ -132,23 +158,23 @@ export function extractText(html, selector) {
 /**
  * Extract the current season from the page title or content.
  *
- * @param {string} html - HTML content
- * @returns {number|null} Season year or null if not found
+ * @param html - HTML content
+ * @returns Season year or null if not found
  */
-export function extractSeason(html) {
+export function extractSeason(html: string): number | null {
   const $ = cheerio.load(html);
 
   // Try to find season in page title
   const title = $('title').text();
   const match = title.match(/(\d{4})/);
-  if (match) {
+  if (match?.[1]) {
     return parseInt(match[1]);
   }
 
   // Try content header
   const header = $('#content-header h2').text();
   const headerMatch = header.match(/(\d{4})/);
-  if (headerMatch) {
+  if (headerMatch?.[1]) {
     return parseInt(headerMatch[1]);
   }
 
@@ -158,12 +184,12 @@ export function extractSeason(html) {
 /**
  * Extract valid team names from the homepage.
  *
- * @param {string} html - HTML content of homepage
- * @returns {Array<string>} Array of team names
+ * @param html - HTML content of homepage
+ * @returns Array of team names
  */
-export function extractTeamNames(html) {
+export function extractTeamNames(html: string): string[] {
   const $ = cheerio.load(html);
-  const teams = [];
+  const teams: string[] = [];
 
   // Teams are in the ratings table with links to team.php
   $('a[href*="team.php"]').each((i, el) => {
@@ -184,11 +210,15 @@ export function extractTeamNames(html) {
  * Write data to a file.
  * Creates directories if they don't exist.
  *
- * @param {any} data - Data to write (will be JSON stringified if object/array)
- * @param {string} filepath - Path to write to
- * @param {string} format - 'json', 'csv', or 'auto' (default: 'auto')
+ * @param data - Data to write (will be JSON stringified if object/array)
+ * @param filepath - Path to write to
+ * @param format - 'json', 'csv', or 'auto' (default: 'auto')
  */
-export function writeToFile(data, filepath, format = 'auto') {
+export function writeToFile(
+  data: unknown,
+  filepath: string,
+  format: FileFormat = 'auto'
+): void {
   // Create directory if it doesn't exist
   const dir = path.dirname(filepath);
   if (!fs.existsSync(dir)) {
@@ -196,7 +226,7 @@ export function writeToFile(data, filepath, format = 'auto') {
   }
 
   // Determine format
-  let resolvedFormat = format;
+  let resolvedFormat: FileFormat = format;
   if (format === 'auto') {
     const ext = path.extname(filepath).toLowerCase();
     resolvedFormat = ext === '.csv' ? 'csv' : 'json';
@@ -204,10 +234,11 @@ export function writeToFile(data, filepath, format = 'auto') {
 
   if (resolvedFormat === 'csv' && Array.isArray(data) && data.length > 0) {
     // Convert array of objects to CSV
-    const headers = Object.keys(data[0]);
-    const csvLines = [headers.join(',')];
+    const firstRow = data[0] as TableRow;
+    const headers = Object.keys(firstRow);
+    const csvLines: string[] = [headers.join(',')];
 
-    for (const row of data) {
+    for (const row of data as TableRow[]) {
       const values = headers.map(h => {
         const val = row[h] ?? '';
         // Escape values with commas or quotes
@@ -230,25 +261,25 @@ export function writeToFile(data, filepath, format = 'auto') {
 /**
  * Read data from a file.
  *
- * @param {string} filepath - Path to read from
- * @param {string} format - 'json', 'text', or 'auto' (default: 'auto')
- * @returns {any} Parsed data
+ * @param filepath - Path to read from
+ * @param format - 'json', 'text', or 'auto' (default: 'auto')
+ * @returns Parsed data
  */
-export function readFromFile(filepath, format = 'auto') {
+export function readFromFile(filepath: string, format: FileFormat = 'auto'): unknown {
   if (!fs.existsSync(filepath)) {
-    throw new Error(`File not found: ${filepath}`);
+    throw new Error(`File not found: ${filepath}. Please check that the path is correct and the file exists.`);
   }
 
   const content = fs.readFileSync(filepath, 'utf-8');
 
-  let resolvedFormat = format;
+  let resolvedFormat: FileFormat = format;
   if (format === 'auto') {
     const ext = path.extname(filepath).toLowerCase();
     resolvedFormat = ext === '.json' ? 'json' : 'text';
   }
 
   if (resolvedFormat === 'json') {
-    return JSON.parse(content);
+    return JSON.parse(content) as unknown;
   }
 
   return content;
@@ -261,32 +292,30 @@ export function readFromFile(filepath, format = 'auto') {
 /**
  * Pause execution for specified milliseconds.
  *
- * @param {number} ms - Milliseconds to pause
- * @returns {Promise<void>}
+ * @param ms - Milliseconds to pause
  */
-export function pause(ms) {
+export function pause(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
  * Generate a random delay between min and max milliseconds.
  *
- * @param {number} minMs - Minimum milliseconds
- * @param {number} maxMs - Maximum milliseconds
- * @returns {number} Random delay in milliseconds
+ * @param minMs - Minimum milliseconds
+ * @param maxMs - Maximum milliseconds
+ * @returns Random delay in milliseconds
  */
-export function randomDelay(minMs = 2000, maxMs = 7000) {
+export function randomDelay(minMs: number = 2000, maxMs: number = 7000): number {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
 /**
  * Pause for a random delay between min and max.
  *
- * @param {number} minMs - Minimum milliseconds
- * @param {number} maxMs - Maximum milliseconds
- * @returns {Promise<void>}
+ * @param minMs - Minimum milliseconds
+ * @param maxMs - Maximum milliseconds
  */
-export async function randomPause(minMs = 2000, maxMs = 7000) {
+export async function randomPause(minMs: number = 2000, maxMs: number = 7000): Promise<void> {
   const delay = randomDelay(minMs, maxMs);
   await pause(delay);
 }
@@ -298,33 +327,50 @@ export async function randomPause(minMs = 2000, maxMs = 7000) {
 /**
  * Create a cloudscraper client for handling Cloudflare protection.
  *
- * @returns {Promise<Object>} Cloudscraper session
+ * @returns Cloudscraper session
  */
-export async function createCloudscraperClient() {
+export async function createCloudscraperClient(): Promise<CloudscraperClient> {
   const cloudscraper = await import('cloudscraper');
+  const client = (cloudscraper.default || cloudscraper) as unknown as CloudscraperClient['client'];
   return {
     type: 'cloudscraper',
-    client: cloudscraper.default || cloudscraper,
+    client,
   };
 }
 
 /**
- * Create a puppeteer client with stealth (Tier 3).
+ * Create a puppeteer client with stealth (Tier 2).
  *
- * @returns {Promise<Object>} Puppeteer browser and page
+ * @returns Puppeteer browser and page
  */
-export async function createPuppeteerClient() {
+export async function createPuppeteerClient(): Promise<PuppeteerClient> {
   try {
-    const puppeteerExtra = await import('puppeteer-extra');
-    const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
+    // Dynamic import with type assertions for optional dependencies
+    // Using unknown first to avoid type inference issues with puppeteer-extra
+    const puppeteerExtraModule = await import('puppeteer-extra');
+    const stealthModule = await import('puppeteer-extra-plugin-stealth');
 
-    const puppeteer = puppeteerExtra.default || puppeteerExtra;
-    const stealth = StealthPlugin.default || StealthPlugin;
+    // Type the modules explicitly
+    const puppeteer = puppeteerExtraModule.default as unknown as {
+      use: (plugin: unknown) => void;
+      launch: (options: { headless?: boolean | string; args?: string[] }) => Promise<{
+        newPage: () => Promise<{
+          setUserAgent: (ua: string) => Promise<void>;
+          goto: (url: string, options?: { waitUntil?: string }) => Promise<unknown>;
+          content: () => Promise<string>;
+          type: (selector: string, text: string) => Promise<void>;
+          click: (selector: string) => Promise<void>;
+          waitForNavigation: (options?: { waitUntil?: string }) => Promise<unknown>;
+        }>;
+        close: () => Promise<void>;
+      }>;
+    };
+    const stealth = stealthModule.default as unknown as () => unknown;
 
     puppeteer.use(stealth());
 
     const browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -333,16 +379,17 @@ export async function createPuppeteerClient() {
     });
 
     const page = await browser.newPage();
-    await page.setUserAgent(DEFAULT_HEADERS['User-Agent']);
+    await page.setUserAgent(DEFAULT_HEADERS['User-Agent'] ?? '');
 
     return {
       type: 'puppeteer',
-      browser,
-      page,
+      browser: browser as unknown as PuppeteerClient['browser'],
+      page: page as unknown as PuppeteerClient['page'],
       close: async () => await browser.close(),
     };
   } catch (e) {
-    throw new Error(`Puppeteer not available: ${e.message}. Install puppeteer-extra and puppeteer-extra-plugin-stealth.`);
+    const error = e as Error;
+    throw new Error(`Puppeteer not available: ${error.message}. Install puppeteer-extra and puppeteer-extra-plugin-stealth.`);
   }
 }
 
@@ -355,31 +402,33 @@ const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '
 /**
  * Create a simple CLI spinner.
  *
- * @param {string} message - Message to display
- * @returns {{ update: Function, stop: Function }} Spinner controls
+ * @param message - Message to display
+ * @returns Spinner controls
  */
-export function createSpinner(message) {
+export function createSpinner(message: string): SpinnerControl {
+  let currentMessage = message;
   let frameIndex = 0;
-  let interval = null;
+  let interval: ReturnType<typeof setInterval> | null = null;
 
-  const update = (newMessage) => {
-    message = newMessage || message;
+  const update = (newMessage?: string): void => {
+    currentMessage = newMessage ?? currentMessage;
   };
 
-  const start = () => {
+  const start = (): void => {
     interval = setInterval(() => {
-      process.stdout.write(`\r${spinnerFrames[frameIndex]} ${message}`);
+      const frame = spinnerFrames[frameIndex];
+      process.stdout.write(`\r${frame} ${currentMessage}`);
       frameIndex = (frameIndex + 1) % spinnerFrames.length;
     }, 80);
   };
 
-  const stop = (finalMessage, success = true) => {
+  const stop = (finalMessage?: string, success: boolean = true): void => {
     if (interval) {
       clearInterval(interval);
       interval = null;
     }
     const symbol = success ? '✓' : '✗';
-    process.stdout.write(`\r${symbol} ${finalMessage || message}\n`);
+    process.stdout.write(`\r${symbol} ${finalMessage ?? currentMessage}\n`);
   };
 
   start();
@@ -393,12 +442,12 @@ export function createSpinner(message) {
 /**
  * Generate an array of years from start to end (inclusive).
  *
- * @param {number} startYear - Start year
- * @param {number} endYear - End year
- * @returns {Array<number>} Array of years
+ * @param startYear - Start year
+ * @param endYear - End year
+ * @returns Array of years
  */
-export function generateYearRange(startYear, endYear) {
-  const years = [];
+export function generateYearRange(startYear: number, endYear: number): number[] {
+  const years: number[] = [];
   for (let year = startYear; year <= endYear; year++) {
     years.push(year);
   }
@@ -408,17 +457,17 @@ export function generateYearRange(startYear, endYear) {
 /**
  * Generate an array of dates from start to end (inclusive).
  *
- * @param {string} startDate - Start date (YYYY-MM-DD)
- * @param {string} endDate - End date (YYYY-MM-DD)
- * @returns {Array<string>} Array of date strings
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Array of date strings
  */
-export function generateDateRange(startDate, endDate) {
-  const dates = [];
+export function generateDateRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
   const current = new Date(startDate);
   const end = new Date(endDate);
 
   while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
+    dates.push(current.toISOString().split('T')[0] ?? '');
     current.setDate(current.getDate() + 1);
   }
 
@@ -428,19 +477,19 @@ export function generateDateRange(startDate, endDate) {
 /**
  * Get the NCAAM season start date (November 1 of previous year).
  *
- * @param {number} season - Season year (e.g., 2025)
- * @returns {string} Start date (YYYY-MM-DD)
+ * @param season - Season year (e.g., 2025)
+ * @returns Start date (YYYY-MM-DD)
  */
-export function ncaamStartDate(season) {
+export function ncaamStartDate(season: number): string {
   return `${season - 1}-11-01`;
 }
 
 /**
  * Get the NCAAM season end date (April 30).
  *
- * @param {number} season - Season year (e.g., 2025)
- * @returns {string} End date (YYYY-MM-DD)
+ * @param season - Season year (e.g., 2025)
+ * @returns End date (YYYY-MM-DD)
  */
-export function ncaamEndDate(season) {
+export function ncaamEndDate(season: number): string {
   return `${season}-04-30`;
 }

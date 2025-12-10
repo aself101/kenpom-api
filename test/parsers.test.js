@@ -32,7 +32,7 @@ import {
   parseConferenceOffense,
   parseConferenceDefense,
   parseConferenceAggregateStats
-} from '../parsers.js';
+} from '../dist/parsers.js';
 
 // ============================================================================
 // HELPER FUNCTION TESTS
@@ -55,8 +55,9 @@ describe('stripSeed', () => {
   });
 
   it('should handle null/undefined', () => {
-    expect(stripSeed(null)).toBe(null);
-    expect(stripSeed(undefined)).toBe(undefined);
+    // TypeScript version returns empty string for null/undefined
+    expect(stripSeed(null)).toBe('');
+    expect(stripSeed(undefined)).toBe('');
   });
 
   it('should handle empty string', () => {

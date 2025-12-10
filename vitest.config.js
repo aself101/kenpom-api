@@ -7,8 +7,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['*.js'],
-      exclude: ['cli.js', 'vitest.config.js'],
+      include: ['dist/**/*.js'],
+      exclude: ['dist/cli.js', 'vitest.config.js'],
     },
   },
 });

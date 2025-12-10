@@ -2,35 +2,53 @@
   "name": "kenpom-api",
   "version": "1.0.2",
   "description": "KenPom.com API wrapper - College basketball statistics for Node.js with CLI",
-  "main": "api.js",
+  "main": "dist/api.js",
+  "types": "dist/api.d.ts",
   "type": "module",
   "bin": {
-    "kenpom": "cli.js"
+    "kenpom": "dist/cli.js"
   },
   "exports": {
-    ".": "./api.js",
-    "./api": "./api.js",
-    "./utils": "./utils.js",
-    "./config": "./config.js",
-    "./parsers": "./parsers.js"
+    ".": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./parsers": {
+      "types": "./dist/parsers.d.ts",
+      "import": "./dist/parsers.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
   },
   "files": [
-    "api.js",
-    "cli.js",
-    "utils.js",
-    "config.js",
-    "parsers.js",
+    "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "kenpom": "node cli.js",
-    "kenpom:help": "node cli.js --help",
-    "kenpom:ratings": "node cli.js --ratings",
-    "kenpom:efficiency": "node cli.js --efficiency",
+    "build": "tsc",
+    "kenpom": "node dist/cli.js",
+    "kenpom:help": "node dist/cli.js --help",
+    "kenpom:ratings": "node dist/cli.js --ratings",
+    "kenpom:efficiency": "node dist/cli.js --efficiency",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "kenpom",
@@ -58,8 +76,11 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.6",
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^25.0.0",
     "@vitest/coverage-v8": "^4.0.10",
     "semantic-release": "^24.2.9",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.10"
   },
   "optionalDependencies": {

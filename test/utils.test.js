@@ -21,7 +21,7 @@ import {
   readFromFile,
   pause,
   randomPause,
-} from '../utils.js';
+} from '../dist/utils.js';
 
 describe('utils', () => {
   describe('parseTable', () => {

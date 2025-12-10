@@ -8,38 +8,71 @@
 
 import * as cheerio from 'cheerio';
 
+// Cheerio types - extract from cheerio module
+type CheerioAPI = ReturnType<typeof cheerio.load>;
+type CheerioElement = ReturnType<CheerioAPI>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CheerioNode = any;
+import type {
+  TableRow,
+  PomeroyRating,
+  EfficiencyData,
+  FourFactorsData,
+  TeamStatsData,
+  PointDistData,
+  HeightData,
+  PlayerStats,
+  KpoyPlayer,
+  KpoyResult,
+  RefData,
+  HcaData,
+  ArenaData,
+  GameAttribData,
+  ProgramRatingData,
+  TrendsData,
+  ScheduleGame,
+  FanMatchGame,
+  FanMatchSummary,
+  FanMatchResult,
+  GameResult,
+  ScoutingReportStats,
+  ConferenceStandingsData,
+  ConferenceStatsData,
+  ConferenceAggregateData,
+} from './types.js';
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
 /**
  * Strip tournament seed numbers from team name.
- * @param {string} team - Team name possibly containing seed
- * @returns {string} Clean team name
+ * @param team - Team name possibly containing seed
+ * @returns Clean team name
  */
-export function stripSeed(team) {
-  if (!team) return team;
+export function stripSeed(team: string | undefined | null): string {
+  if (!team) return '';
   return team.replace(/\d+/g, '').trim();
 }
 
 /**
  * Extract seed from team name.
- * @param {string} team - Team name possibly containing seed
- * @returns {string|null} Seed number or null
+ * @param team - Team name possibly containing seed
+ * @returns Seed number or null
  */
-export function extractSeed(team) {
+export function extractSeed(team: string | undefined | null): string | null {
   if (!team) return null;
   const match = team.match(/(\d+)/);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 /**
  * Parse a table from HTML using cheerio.
- * @param {string} html - HTML content
- * @param {number} tableIndex - Index of table to parse
- * @returns {{ $: CheerioAPI, table: Cheerio, rows: Array }}
+ * @param html - HTML content
+ * @param tableIndex - Index of table to parse
+ * @returns Cheerio $ and table element
  */
-function getTable(html, tableIndex = 0) {
+function getTable(html: string, tableIndex: number = 0): { $: CheerioAPI; table: CheerioElement } {
   const $ = cheerio.load(html);
   const tables = $('table');
 
@@ -56,25 +89,26 @@ function getTable(html, tableIndex = 0) {
 
 /**
  * Extract rows from a table with given column names.
- * @param {CheerioAPI} $ - Cheerio instance
- * @param {Cheerio} table - Table element
- * @param {Array<string>} columns - Column names to use
- * @returns {Array<Object>} Parsed rows
+ * @param $ - Cheerio instance
+ * @param table - Table element
+ * @param columns - Column names to use
+ * @returns Parsed rows
  */
-function extractRows($, table, columns) {
-  const rows = [];
+function extractRows($: CheerioAPI, table: CheerioElement, columns: string[]): TableRow[] {
+  const rows: TableRow[] = [];
   const tbody = table.find('tbody');
   // If no tbody, skip first row (index 0) as it's typically the header row
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
-  bodyRows.each((i, row) => {
+  bodyRows.each((_i: number, row: CheerioNode) => {
     const cells = $(row).find('td');
     if (cells.length === 0) return;
 
-    const rowData = {};
-    cells.each((j, cell) => {
-      if (j < columns.length) {
-        rowData[columns[j]] = $(cell).text().trim();
+    const rowData: TableRow = {};
+    cells.each((j: number, cell: CheerioNode) => {
+      const col = columns[j];
+      if (col !== undefined) {
+        rowData[col] = $(cell).text().trim();
       }
     });
 
@@ -94,14 +128,14 @@ function extractRows($, table, columns) {
  * Parse Pomeroy ratings table.
  * Handles MultiIndex headers and extracts Seed from team name.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed ratings with columns:
+ * @param html - HTML content
+ * @returns Parsed ratings with columns:
  *   Rk, Team, Conf, W-L, AdjEM, AdjO, AdjO.Rank, AdjD, AdjD.Rank,
  *   AdjT, AdjT.Rank, Luck, Luck.Rank, SOS-AdjEM, SOS-AdjEM.Rank,
  *   SOS-OppO, SOS-OppO.Rank, SOS-OppD, SOS-OppD.Rank,
  *   NCSOS-AdjEM, NCSOS-AdjEM.Rank, Seed
  */
-export function parsePomeroyRatings(html) {
+export function parsePomeroyRatings(html: string): PomeroyRating[] {
   const { $, table } = getTable(html, 0);
 
   // Fixed column names matching kenpompy output
@@ -117,14 +151,14 @@ export function parsePomeroyRatings(html) {
 
   // Post-process: filter headers, extract seed, clean team name
   return rows
-    .filter(row => row.Rk !== 'Rk' && row.Rk !== '')
+    .filter(row => row['Rk'] !== 'Rk' && row['Rk'] !== '')
     .map(row => {
-      const seed = extractSeed(row.Team);
+      const seed = extractSeed(row['Team']);
       return {
         ...row,
-        Team: stripSeed(row.Team),
-        Seed: seed || ''
-      };
+        Team: stripSeed(row['Team']),
+        Seed: seed ?? ''
+      } as PomeroyRating;
     });
 }
 
@@ -136,15 +170,15 @@ export function parsePomeroyRatings(html) {
  * Parse efficiency/summary table.
  * Year-dependent columns: 14 pre-2010, 18 for 2010+.
  *
- * @param {string} html - HTML content
- * @param {number} season - Season year
- * @returns {Array<Object>} Parsed efficiency data
+ * @param html - HTML content
+ * @param season - Season year
+ * @returns Parsed efficiency data
  */
-export function parseEfficiency(html, season) {
+export function parseEfficiency(html: string, season: number | null): EfficiencyData[] {
   const { $, table } = getTable(html, 0);
 
   // Column names depend on year - KenPom added Avg.Poss.Length columns in 2010
-  let columns;
+  let columns: string[];
   if (season && season < 2010) {
     columns = [
       'Team', 'Conference',
@@ -165,11 +199,11 @@ export function parseEfficiency(html, season) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Team !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
     .map(row => ({
       ...row,
-      Team: stripSeed(row.Team)
-    }));
+      Team: stripSeed(row['Team'])
+    })) as EfficiencyData[];
 }
 
 // ============================================================================
@@ -180,10 +214,10 @@ export function parseEfficiency(html, season) {
  * Parse four factors table.
  * Fixed 24 columns.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed four factors data
+ * @param html - HTML content
+ * @returns Parsed four factors data
  */
-export function parseFourFactors(html) {
+export function parseFourFactors(html: string): FourFactorsData[] {
   const { $, table } = getTable(html, 0);
 
   const columns = [
@@ -199,11 +233,11 @@ export function parseFourFactors(html) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Team !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
     .map(row => ({
       ...row,
-      Team: stripSeed(row.Team)
-    }));
+      Team: stripSeed(row['Team'])
+    })) as FourFactorsData[];
 }
 
 // ============================================================================
@@ -214,11 +248,11 @@ export function parseFourFactors(html) {
  * Parse team stats table.
  * Fixed 20 columns, last two vary based on offense/defense.
  *
- * @param {string} html - HTML content
- * @param {boolean} defense - Whether this is defensive stats
- * @returns {Array<Object>} Parsed team stats
+ * @param html - HTML content
+ * @param defense - Whether this is defensive stats
+ * @returns Parsed team stats
  */
-export function parseTeamStats(html, defense = false) {
+export function parseTeamStats(html: string, defense: boolean = false): TeamStatsData[] {
   const { $, table } = getTable(html, 0);
 
   const lastCol = defense ? 'AdjDE' : 'AdjOE';
@@ -233,11 +267,11 @@ export function parseTeamStats(html, defense = false) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Team !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
     .map(row => ({
       ...row,
-      Team: stripSeed(row.Team)
-    }));
+      Team: stripSeed(row['Team'])
+    })) as TeamStatsData[];
 }
 
 // ============================================================================
@@ -248,10 +282,10 @@ export function parseTeamStats(html, defense = false) {
  * Parse point distribution table.
  * Fixed 14 columns.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed point distribution data
+ * @param html - HTML content
+ * @returns Parsed point distribution data
  */
-export function parsePointDist(html) {
+export function parsePointDist(html: string): PointDistData[] {
   const { $, table } = getTable(html, 0);
 
   const columns = [
@@ -263,11 +297,11 @@ export function parsePointDist(html) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Team !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
     .map(row => ({
       ...row,
-      Team: stripSeed(row.Team)
-    }));
+      Team: stripSeed(row['Team'])
+    })) as PointDistData[];
 }
 
 // ============================================================================
@@ -278,15 +312,15 @@ export function parsePointDist(html) {
  * Parse height/experience table.
  * Year-dependent: 20 columns pre-2008, 22 for 2008+.
  *
- * @param {string} html - HTML content
- * @param {number} season - Season year
- * @returns {Array<Object>} Parsed height data
+ * @param html - HTML content
+ * @param season - Season year
+ * @returns Parsed height data
  */
-export function parseHeight(html, season) {
+export function parseHeight(html: string, season: number | null): HeightData[] {
   const { $, table } = getTable(html, 0);
 
   // KenPom added Continuity columns in 2008
-  let columns;
+  let columns: string[];
   if (season && season < 2008) {
     columns = [
       'Team', 'Conference',
@@ -311,11 +345,11 @@ export function parseHeight(html, season) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Team !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
     .map(row => ({
       ...row,
-      Team: stripSeed(row.Team)
-    }));
+      Team: stripSeed(row['Team'])
+    })) as HeightData[];
 }
 
 // ============================================================================
@@ -327,16 +361,16 @@ export function parseHeight(html, season) {
  * ORtg metric returns special format with Poss%.
  * FG metrics (2P, 3P, FT) expand to Made/Attempted/Pct.
  *
- * @param {string} html - HTML content
- * @param {string} metric - Player stat metric
- * @returns {Array<Object>|Array<Array<Object>>} Parsed player stats
+ * @param html - HTML content
+ * @param metric - Player stat metric
+ * @returns Parsed player stats
  *   (ORtg returns array of 4 tables for different possession thresholds)
  */
-export function parsePlayerStats(html, metric = 'eFG') {
+export function parsePlayerStats(html: string, metric: string = 'eFG'): PlayerStats[] {
   const { $, table } = getTable(html, 0);
 
   // Base columns
-  let columns = ['Rank', 'Player', 'Team'];
+  const columns: string[] = ['Rank', 'Player', 'Team'];
 
   // Handle FG metrics that have Made/Attempted/Pct
   const fgMetrics = ['2P', '3P', 'FT'];
@@ -352,42 +386,42 @@ export function parsePlayerStats(html, metric = 'eFG') {
 
   // Filter header rows and empty ranks
   let filtered = rows.filter(row =>
-    row.Rank !== 'Rank' &&
-    row.Rank !== '' &&
-    row.Player !== ''
+    row['Rank'] !== 'Rank' &&
+    row['Rank'] !== '' &&
+    row['Player'] !== ''
   );
 
   // For ORtg, split the value to extract Poss%
   if (metric === 'ORtg') {
     filtered = filtered.map(row => {
-      const ortgValue = row.ORtg || '';
+      const ortgValue = row['ORtg'] ?? '';
       const parts = ortgValue.split(' ');
       return {
         ...row,
-        ORtg: parts[0] || '',
+        ORtg: parts[0] ?? '',
         'Poss%': parts[1] ? parts[1].replace(/[()]/g, '') : ''
       };
     });
   }
 
-  return filtered;
+  return filtered as PlayerStats[];
 }
 
 /**
  * Parse all player stats tables (for ORtg which has 4 tables).
  *
- * @param {string} html - HTML content
- * @returns {Array<Array<Object>>} Array of 4 parsed tables
+ * @param html - HTML content
+ * @returns Array of 4 parsed tables
  */
-export function parseAllPlayerStatsTables(html) {
+export function parseAllPlayerStatsTables(html: string): PlayerStats[][] {
   const $ = cheerio.load(html);
   const tables = $('table');
-  const results = [];
+  const results: PlayerStats[][] = [];
 
   const columns = ['Rank', 'Player', 'Team', 'ORtg', 'Ht', 'Wt', 'Yr'];
 
   tables.each((i, tableEl) => {
-    const rows = [];
+    const rows: PlayerStats[] = [];
     const table = $(tableEl);
     const tbody = table.find('tbody');
     const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
@@ -396,20 +430,21 @@ export function parseAllPlayerStatsTables(html) {
       const cells = $(row).find('td');
       if (cells.length === 0) return;
 
-      const rowData = {};
+      const rowData: TableRow = {};
       cells.each((k, cell) => {
-        if (k < columns.length) {
-          rowData[columns[k]] = $(cell).text().trim();
+        const col = columns[k];
+        if (col !== undefined) {
+          rowData[col] = $(cell).text().trim();
         }
       });
 
-      if (rowData.Rank && rowData.Rank !== 'Rank') {
+      if (rowData['Rank'] && rowData['Rank'] !== 'Rank') {
         // Split ORtg to extract Poss%
-        const ortgValue = rowData.ORtg || '';
+        const ortgValue = rowData['ORtg'] ?? '';
         const parts = ortgValue.split(' ');
-        rowData.ORtg = parts[0] || '';
+        rowData['ORtg'] = parts[0] ?? '';
         rowData['Poss%'] = parts[1] ? parts[1].replace(/[()]/g, '') : '';
-        rows.push(rowData);
+        rows.push(rowData as PlayerStats);
       }
     });
 
@@ -429,20 +464,20 @@ export function parseAllPlayerStatsTables(html) {
  * Parse KPOY (Player of the Year) table.
  * Extracts player info from complex column format.
  *
- * @param {string} html - HTML content
- * @param {number} season - Season year
- * @returns {{ kpoy: Array<Object>, mvp: Array<Object>|null }}
+ * @param html - HTML content
+ * @param season - Season year
+ * @returns KPOY and MVP data
  */
-export function parseKpoy(html, season) {
+export function parseKpoy(html: string, season: number | null): KpoyResult {
   const $ = cheerio.load(html);
   const tables = $('table');
 
-  const parseKpoyTable = (table) => {
-    const rows = [];
+  const parseKpoyTable = (table: CheerioElement): KpoyPlayer[] => {
+    const rows: KpoyPlayer[] = [];
     const tbody = table.find('tbody');
     const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
-    bodyRows.each((i, row) => {
+    bodyRows.each((_i: number, row: CheerioNode) => {
       const cells = $(row).find('td');
       if (cells.length < 3) return;
 
@@ -455,32 +490,32 @@ export function parseKpoy(html, season) {
       // Parse player info: "Name · Weight, Year, Hometown"
       // Then extract team from name portion
       const parts = playerInfo.split(' · ');
-      const nameTeam = parts[0] || '';
-      const details = parts[1] || '';
+      const nameTeam = parts[0] ?? '';
+      const details = parts[1] ?? '';
 
       // Extract team (last part after comma in name section)
       const nameParts = nameTeam.split(', ');
-      const player = nameParts[0] || '';
-      const teamInfo = nameParts[1] || '';
+      const player = nameParts[0] ?? '';
+      const teamInfo = nameParts[1] ?? '';
 
       // Team name has numbers (height) we need to extract
       const teamMatch = teamInfo.match(/^([A-Za-z.\s&']+)/);
-      const team = teamMatch ? teamMatch[1].trim() : teamInfo;
+      const team = teamMatch?.[1] ? teamMatch[1].trim() : teamInfo;
 
       // Extract height from team info
       const heightMatch = teamInfo.match(/(\d+-\d+)/);
-      const height = heightMatch ? heightMatch[1] : '';
+      const height = heightMatch?.[1] ?? '';
 
       // Parse details: "Weight, Year, Hometown"
       const detailParts = details.split(', ');
-      const weight = detailParts[0] || '';
-      const year = detailParts[1] || '';
+      const weight = detailParts[0] ?? '';
+      const year = detailParts[1] ?? '';
       const hometown = detailParts.slice(2).join(', ') || '';
 
       rows.push({
         Rank: rank,
         Player: player,
-        Team: team,
+        Team: team ?? '',
         Height: height,
         Weight: weight,
         Year: year,
@@ -492,7 +527,7 @@ export function parseKpoy(html, season) {
     return rows;
   };
 
-  const result = {
+  const result: KpoyResult = {
     kpoy: tables.length > 0 ? parseKpoyTable(tables.eq(0)) : [],
     mvp: null
   };
@@ -512,10 +547,10 @@ export function parseKpoy(html, season) {
 /**
  * Parse referee rankings table.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed referee data
+ * @param html - HTML content
+ * @returns Parsed referee data
  */
-export function parseRefs(html) {
+export function parseRefs(html: string): RefData[] {
   const { $, table } = getTable(html, 0);
 
   // Columns: Rank, Name, Rating, Games, Last Game, Game Score, Box
@@ -525,10 +560,16 @@ export function parseRefs(html) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Rating !== 'Rating' && row.Rank !== '')
+    .filter(row => row['Rating'] !== 'Rating' && row['Rank'] !== '')
     .map(row => {
-      const { Box, ...rest } = row;
-      return rest;
+      return {
+        Rank: row['Rank'] ?? '',
+        Name: row['Name'] ?? '',
+        Rating: row['Rating'] ?? '',
+        Games: row['Games'] ?? '',
+        'Last Game': row['Last Game'] ?? '',
+        'Game Score': row['Game Score'] ?? ''
+      } as RefData;
     });
 }
 
@@ -539,10 +580,10 @@ export function parseRefs(html) {
 /**
  * Parse home court advantage table.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed HCA data
+ * @param html - HTML content
+ * @returns Parsed HCA data
  */
-export function parseHca(html) {
+export function parseHca(html: string): HcaData[] {
   const { $, table } = getTable(html, 0);
 
   const columns = [
@@ -557,7 +598,9 @@ export function parseHca(html) {
 
   const rows = extractRows($, table, columns);
 
-  return rows.filter(row => row.Team !== 'Team' && row.Team !== '');
+  return rows
+    .filter(row => row['Team'] !== 'Team' && row['Team'] !== '')
+    .map(row => row as unknown as HcaData);
 }
 
 // ============================================================================
@@ -568,10 +611,10 @@ export function parseHca(html) {
  * Parse arenas table.
  * Splits Arena and Alternate columns to extract capacity.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed arena data
+ * @param html - HTML content
+ * @returns Parsed arena data
  */
-export function parseArenas(html) {
+export function parseArenas(html: string): ArenaData[] {
   const { $, table } = getTable(html, 0);
 
   const columns = ['Rank', 'Team', 'Conference', 'Arena', 'Alternate'];
@@ -579,21 +622,21 @@ export function parseArenas(html) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Team !== 'Team' && row.Rank !== '')
+    .filter(row => row['Team'] !== 'Team' && row['Rank'] !== '')
     .map(row => {
       // Split Arena on ' (' to get name and capacity
-      const arenaMatch = (row.Arena || '').match(/^(.+?)\s*\((\d+)\)$/);
-      const altMatch = (row.Alternate || '').match(/^(.+?)\s*\((\d+)\)$/);
+      const arenaMatch = (row['Arena'] ?? '').match(/^(.+?)\s*\((\d+)\)$/);
+      const altMatch = (row['Alternate'] ?? '').match(/^(.+?)\s*\((\d+)\)$/);
 
       return {
-        Rank: row.Rank,
-        Team: row.Team,
-        Conference: row.Conference,
-        Arena: arenaMatch ? arenaMatch[1].trim() : row.Arena,
-        'Arena.Capacity': arenaMatch ? arenaMatch[2] : '',
-        Alternate: altMatch ? altMatch[1].trim() : row.Alternate,
-        'Alternate.Capacity': altMatch ? altMatch[2] : ''
-      };
+        Rank: row['Rank'] ?? '',
+        Team: row['Team'] ?? '',
+        Conference: row['Conference'] ?? '',
+        Arena: arenaMatch?.[1] ? arenaMatch[1].trim() : (row['Arena'] ?? ''),
+        'Arena.Capacity': arenaMatch?.[2] ?? '',
+        Alternate: altMatch?.[1] ? altMatch[1].trim() : (row['Alternate'] ?? ''),
+        'Alternate.Capacity': altMatch?.[2] ?? ''
+      } as ArenaData;
     });
 }
 
@@ -605,10 +648,10 @@ export function parseArenas(html) {
  * Parse game attributes table.
  * Splits Location to extract Arena name.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed game attributes
+ * @param html - HTML content
+ * @returns Parsed game attributes
  */
-export function parseGameAttribs(html) {
+export function parseGameAttribs(html: string): GameAttribData[] {
   const { $, table } = getTable(html, 0);
 
   // Columns: Rank, Date, Game, Box, Location, Conf.Matchup, Value
@@ -617,17 +660,20 @@ export function parseGameAttribs(html) {
   const rows = extractRows($, table, columns);
 
   return rows
-    .filter(row => row.Rank !== 'Rank' && row.Rank !== '')
+    .filter(row => row['Rank'] !== 'Rank' && row['Rank'] !== '')
     .map(row => {
       // Split Location on ' (' to get location and arena
-      const locMatch = (row.Location || '').match(/^(.+?)\s*\((.+)\)$/);
+      const locMatch = (row['Location'] ?? '').match(/^(.+?)\s*\((.+)\)$/);
 
-      const { Box, ...rest } = row;
       return {
-        ...rest,
-        Location: locMatch ? locMatch[1].trim() : row.Location,
-        Arena: locMatch ? locMatch[2].replace(/\)$/, '') : ''
-      };
+        Rank: row['Rank'] ?? '',
+        Date: row['Date'] ?? '',
+        Game: row['Game'] ?? '',
+        Location: locMatch?.[1] ? locMatch[1].trim() : (row['Location'] ?? ''),
+        Arena: locMatch?.[2] ? locMatch[2].replace(/\)$/, '') : '',
+        'Conf.Matchup': row['Conf.Matchup'] ?? '',
+        Value: row['Value'] ?? ''
+      } as GameAttribData;
     });
 }
 
@@ -638,10 +684,10 @@ export function parseGameAttribs(html) {
 /**
  * Parse program ratings table.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed program ratings
+ * @param html - HTML content
+ * @returns Parsed program ratings
  */
-export function parseProgramRatings(html) {
+export function parseProgramRatings(html: string): ProgramRatingData[] {
   const { $, table } = getTable(html, 0);
 
   const columns = [
@@ -656,7 +702,7 @@ export function parseProgramRatings(html) {
 
   const rows = extractRows($, table, columns);
 
-  return rows.filter(row => row.Team !== 'Team' && row.Rank !== '');
+  return rows.filter(row => row['Team'] !== 'Team' && row['Rank'] !== '') as unknown as ProgramRatingData[];
 }
 
 // ============================================================================
@@ -666,22 +712,22 @@ export function parseProgramRatings(html) {
 /**
  * Parse trends table.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Parsed trends data
+ * @param html - HTML content
+ * @returns Parsed trends data
  */
-export function parseTrends(html) {
+export function parseTrends(html: string): TrendsData[] {
   const { $, table } = getTable(html, 0);
 
   // Extract headers from the table
-  const headers = [];
-  table.find('thead tr th, thead tr td').each((i, el) => {
+  const headers: string[] = [];
+  table.find('thead tr th, thead tr td').each((i: number, el: CheerioNode) => {
     headers.push($(el).text().trim() || `Column${i}`);
   });
 
   const rows = extractRows($, table, headers);
 
   // Drop last 5 rows which contain summary/totals, matching kenpompy behavior
-  return rows.slice(0, -5);
+  return rows.slice(0, -5) as TrendsData[];
 }
 
 // ============================================================================
@@ -693,11 +739,11 @@ export function parseTrends(html) {
  * Uses table index 1 (second table on page).
  * Handles year-dependent columns and postseason tracking.
  *
- * @param {string} html - HTML content
- * @param {number} season - Season year
- * @returns {Array<Object>} Parsed schedule
+ * @param html - HTML content
+ * @param season - Season year
+ * @returns Parsed schedule
  */
-export function parseSchedule(html, season) {
+export function parseSchedule(html: string, season: number | null): ScheduleGame[] {
   const $ = cheerio.load(html);
   const tables = $('table');
 
@@ -709,7 +755,7 @@ export function parseSchedule(html, season) {
   const table = tables.eq(1);
 
   // KenPom added Team Rank column to schedule in 2010
-  let columns;
+  let columns: string[];
   if (season && season < 2010) {
     columns = [
       'Date', 'Opponent Rank', 'Opponent Name', 'Result',
@@ -722,7 +768,7 @@ export function parseSchedule(html, season) {
     ];
   }
 
-  const rows = [];
+  const rows: ScheduleGame[] = [];
   let currentTournament = '';
 
   const tbody = table.find('tbody');
@@ -741,22 +787,23 @@ export function parseSchedule(html, season) {
 
     if (cells.length === 0) return;
 
-    const rowData = {};
+    const rowData: TableRow = {};
     cells.each((j, cell) => {
-      if (j < columns.length) {
-        rowData[columns[j]] = $(cell).text().trim();
+      const col = columns[j];
+      if (col !== undefined) {
+        rowData[col] = $(cell).text().trim();
       }
     });
 
     // Skip header rows
-    if (rowData.Date === 'Date' || rowData.Date === rowData.Result) return;
+    if (rowData['Date'] === 'Date' || rowData['Date'] === rowData['Result']) return;
 
     // Add tournament info
-    rowData.Tournament = currentTournament;
+    rowData['Tournament'] = currentTournament;
 
     // Remove unused columns A and B
-    delete rowData.A;
-    delete rowData.B;
+    delete rowData['A'];
+    delete rowData['B'];
 
     // Add Team Rank for pre-2010 if missing
     if (season && season < 2010 && !rowData['Team Rank']) {
@@ -764,7 +811,7 @@ export function parseSchedule(html, season) {
     }
 
     if (Object.keys(rowData).length > 0) {
-      rows.push(rowData);
+      rows.push(rowData as unknown as ScheduleGame);
     }
   });
 
@@ -779,10 +826,10 @@ export function parseSchedule(html, season) {
  * Parse FanMatch table.
  * Complex parsing matching kenpompy output format.
  *
- * @param {string} html - HTML content
- * @returns {{ games: Array<Object>, summary: Object|null }}
+ * @param html - HTML content
+ * @returns FanMatch games and summary
  */
-export function parseFanMatch(html) {
+export function parseFanMatch(html: string): FanMatchResult {
   const $ = cheerio.load(html);
 
   // Check for no games message
@@ -799,16 +846,15 @@ export function parseFanMatch(html) {
 
   // Get header row to determine column names
   const headerRow = table.find('thead tr, tr').first();
-  const headers = [];
+  const headers: string[] = [];
   headerRow.find('th, td').each((i, cell) => {
     headers.push($(cell).text().trim());
   });
 
-  const rows = [];
   const tbody = table.find('tbody');
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
-  let summary = {
+  const summary: FanMatchSummary = {
     linesOfNight: [],
     ppg: null,
     avgEff: null,
@@ -821,8 +867,8 @@ export function parseFanMatch(html) {
     exactMov: null
   };
 
-  const gameRows = [];
-  const extraRows = [];
+  const gameRows: TableRow[] = [];
+  const extraRows: string[] = [];
   let foundExtraSection = false;
 
   bodyRows.each((i, row) => {
@@ -844,15 +890,16 @@ export function parseFanMatch(html) {
     const cells = $(row).find('td');
     if (cells.length === 0) return;
 
-    const rowData = {};
+    const rowData: TableRow = {};
     cells.each((j, cell) => {
       const cellText = $(cell).text().trim();
-      if (j < headers.length && headers[j]) {
-        rowData[headers[j]] = cellText;
+      const header = headers[j];
+      if (header) {
+        rowData[header] = cellText;
       }
     });
 
-    if (!rowData.Game || rowData.Game === 'Game') return;
+    if (!rowData['Game'] || rowData['Game'] === 'Game') return;
 
     gameRows.push(rowData);
   });
@@ -863,21 +910,21 @@ export function parseFanMatch(html) {
       const ppgMatch = text.match(/(\d+\.?\d*)\s*PPG/);
       const effMatch = text.match(/(\d+\.?\d*)\s*Avg Eff/);
       const posMatch = text.match(/(\d+\.?\d*)\s*Pos\/40/);
-      if (ppgMatch) summary.ppg = parseFloat(ppgMatch[1]);
-      if (effMatch) summary.avgEff = parseFloat(effMatch[1]);
-      if (posMatch) summary.pos40 = parseFloat(posMatch[1]);
+      if (ppgMatch?.[1]) summary.ppg = parseFloat(ppgMatch[1]);
+      if (effMatch?.[1]) summary.avgEff = parseFloat(effMatch[1]);
+      if (posMatch?.[1]) summary.pos40 = parseFloat(posMatch[1]);
     }
     if (text.includes('Mean Abs') && text.includes('Pred Total')) {
       const errMatch = text.match(/Mean Abs Err.*?(\d+\.?\d*)/);
       const biasMatch = text.match(/Bias.*?(-?\d+\.?\d*)/);
-      if (errMatch) summary.meanAbsErrPredTotalScore = parseFloat(errMatch[1]);
-      if (biasMatch) summary.biasPredTotalScore = parseFloat(biasMatch[1]);
+      if (errMatch?.[1]) summary.meanAbsErrPredTotalScore = parseFloat(errMatch[1]);
+      if (biasMatch?.[1]) summary.biasPredTotalScore = parseFloat(biasMatch[1]);
     }
     if (text.includes('Mean Abs') && text.includes('MOV')) {
       const errMatch = text.match(/Mean Abs Err.*?(\d+\.?\d*)/);
       const recordMatch = text.match(/Record.*?(\d+-\d+)/);
-      if (errMatch) summary.meanAbsErrPredMov = parseFloat(errMatch[1]);
-      if (recordMatch) summary.recordFavs = recordMatch[1];
+      if (errMatch?.[1]) summary.meanAbsErrPredMov = parseFloat(errMatch[1]);
+      if (recordMatch?.[1]) summary.recordFavs = recordMatch[1];
     }
     if (text.includes('the night') && !text.includes('PPG')) {
       summary.linesOfNight.push(text);
@@ -885,15 +932,15 @@ export function parseFanMatch(html) {
   }
 
   // Process each game row
-  const games = gameRows.map(rowData => {
-    const game = {};
+  const games: FanMatchGame[] = gameRows.map(rowData => {
+    const game: Partial<FanMatchGame> = {};
 
     // Keep original Game string
-    game.Game = rowData.Game || '';
+    game.Game = rowData['Game'] ?? '';
 
     // Extract MVP if present in Game string
     const mvpMatch = game.Game.match(/\s*MVP:\s*(.+)$/);
-    if (mvpMatch) {
+    if (mvpMatch?.[1]) {
       game.MVP = mvpMatch[1].trim();
       game.Game = game.Game.replace(/\s*MVP:\s*.+$/, '');
     } else {
@@ -902,7 +949,7 @@ export function parseFanMatch(html) {
 
     // Extract tournament label
     const tourneyMatch = game.Game.match(/\s+([A-Za-z0-9]{2,}-T|NCAA)\s*$/);
-    if (tourneyMatch) {
+    if (tourneyMatch?.[1]) {
       game.Tournament = tourneyMatch[1];
       game.Game = game.Game.replace(/\s+[A-Za-z0-9]{2,}-T\s*$/, '').replace(/\s+NCAA\s*$/, '');
     } else {
@@ -911,7 +958,7 @@ export function parseFanMatch(html) {
 
     // Extract possessions from Game string [XX]
     const possMatch = game.Game.match(/\s*\[(\d+)\]\s*/);
-    if (possMatch) {
+    if (possMatch?.[1]) {
       game.Possessions = possMatch[1];
       game.Game = game.Game.replace(/\s*\[\d+\]\s*/, ' ').trim();
     } else {
@@ -919,45 +966,49 @@ export function parseFanMatch(html) {
     }
 
     // Thrill Score - keep original column name with space
-    const thrillScore = rowData['Thrill Score'] || rowData.ThrillScore || '';
+    const thrillScore = rowData['Thrill Score'] ?? rowData['ThrillScore'] ?? '';
     // First 4-5 chars are the score, rest is rank
     const thrillMatch = thrillScore.match(/^([\d.]+)/);
-    game['Thrill Score'] = thrillMatch ? thrillMatch[1] : thrillScore.substring(0, 5).trim();
+    game['Thrill Score'] = thrillMatch?.[1] ?? thrillScore.substring(0, 5).trim();
 
     // Come back - keep original column name
-    const comeback = rowData['Come back'] || rowData.Comeback || '';
+    const comeback = rowData['Come back'] ?? rowData['Comeback'] ?? '';
     const comebackParts = comeback.split('·');
-    game['Come back'] = comebackParts[0].trim();
+    game['Come back'] = comebackParts[0]?.trim() ?? '';
 
     // Excite ment - keep original column name
-    const excitement = rowData['Excite ment'] || rowData.Excitement || '';
+    const excitement = rowData['Excite ment'] ?? rowData['Excitement'] ?? '';
     const excitementParts = excitement.split('·');
-    game['Excite ment'] = excitementParts[0].trim();
+    game['Excite ment'] = excitementParts[0]?.trim() ?? '';
 
     // Parse prediction
-    const pred = rowData.Prediction || '';
+    const pred = rowData['Prediction'] ?? '';
     const predRegex = /^(.+?)\s+(\d+-\d+)\s*\((\d+%)\)\s*\[(\d+)\]/;
     const predMatch = pred.match(predRegex);
 
     if (predMatch) {
-      game.PredictedWinner = predMatch[1].trim();
-      game.PredictedScore = predMatch[2];
-      game.WinProbability = predMatch[3];
-      game.PredictedPossessions = parseFloat(predMatch[4]);
+      game.PredictedWinner = predMatch[1]?.trim() ?? null;
+      game.PredictedScore = predMatch[2] ?? null;
+      game.WinProbability = predMatch[3] ?? null;
+      game.PredictedPossessions = predMatch[4] ? parseFloat(predMatch[4]) : null;
 
       // Calculate PredictedMOV from PredictedScore
-      const scores = predMatch[2].split('-').map(Number);
-      game.PredictedMOV = scores.length === 2 ? scores[0] - scores[1] : null;
+      const scores = (predMatch[2] ?? '').split('-').map(Number);
+      game.PredictedMOV = scores.length === 2 && scores[0] !== undefined && scores[1] !== undefined
+        ? scores[0] - scores[1]
+        : null;
     } else {
       // Try simpler match without possessions
       const simplePredMatch = pred.match(/^(.+?)\s+(\d+-\d+)\s*\((\d+%)\)/);
       if (simplePredMatch) {
-        game.PredictedWinner = simplePredMatch[1].trim();
-        game.PredictedScore = simplePredMatch[2];
-        game.WinProbability = simplePredMatch[3];
+        game.PredictedWinner = simplePredMatch[1]?.trim() ?? null;
+        game.PredictedScore = simplePredMatch[2] ?? null;
+        game.WinProbability = simplePredMatch[3] ?? null;
         game.PredictedPossessions = null;
-        const scores = simplePredMatch[2].split('-').map(Number);
-        game.PredictedMOV = scores.length === 2 ? scores[0] - scores[1] : null;
+        const scores = (simplePredMatch[2] ?? '').split('-').map(Number);
+        game.PredictedMOV = scores.length === 2 && scores[0] !== undefined && scores[1] !== undefined
+          ? scores[0] - scores[1]
+          : null;
       } else {
         game.PredictedWinner = null;
         game.PredictedScore = null;
@@ -973,7 +1024,7 @@ export function parseFanMatch(html) {
     }
 
     // Parse game result to extract Winner/Loser with scores and ranks
-    const gameResult = parseGameResult(game.Game);
+    const gameResult = parseGameResult(game.Game ?? '');
     game.Winner = gameResult.Winner;
     game.WinnerRank = gameResult.WinnerRank;
     game.WinnerScore = gameResult.WinnerScore;
@@ -984,9 +1035,9 @@ export function parseFanMatch(html) {
     game.ActualMOV = gameResult.ActualMOV;
 
     // Parse predicted loser from Game and PredictedWinner
-    game.PredictedLoser = parsePredictedLoser(game.Game, game.PredictedWinner);
+    game.PredictedLoser = parsePredictedLoser(game.Game ?? '', game.PredictedWinner ?? null);
 
-    return game;
+    return game as FanMatchGame;
   });
 
   return { games, summary: summary.ppg ? summary : null };
@@ -1000,11 +1051,11 @@ export function parseFanMatch(html) {
  *   - Away: "233 Rice at 273 FIU"
  *   - Neutral: "233 Rice vs. 273 FIU"
  *
- * @param {string} gameStr - Game string to parse
- * @returns {Object} Parsed game result with Winner, Loser, scores, ranks
+ * @param gameStr - Game string to parse
+ * @returns Parsed game result with Winner, Loser, scores, ranks
  */
-export function parseGameResult(gameStr) {
-  const result = {
+export function parseGameResult(gameStr: string): GameResult {
+  const result: GameResult = {
     Winner: null,
     WinnerRank: null,
     WinnerScore: null,
@@ -1020,32 +1071,34 @@ export function parseGameResult(gameStr) {
 
   if (!gameStr) return result;
 
+  let processedStr = gameStr;
+
   // Check for OT indicator
-  const otMatch = gameStr.match(/\((\d?OT)\)$/);
-  if (otMatch) {
+  const otMatch = processedStr.match(/\((\d?OT)\)$/);
+  if (otMatch?.[1]) {
     result.OT = otMatch[1];
-    gameStr = gameStr.replace(/\s*\(\d?OT\)\s*$/, '').trim();
+    processedStr = processedStr.replace(/\s*\(\d?OT\)\s*$/, '').trim();
   }
 
   // Try comma-separated format (completed game): "233 Rice 77, 273 FIU 70"
-  let teams = gameStr.split(', ');
+  let teams = processedStr.split(', ');
 
   if (teams.length === 2) {
     result.isCompleted = true;
 
     // First team is winner
-    const winnerParts = teams[0].trim().split(/\s+/);
-    const loserParts = teams[1].trim().split(/\s+/);
+    const winnerParts = (teams[0] ?? '').trim().split(/\s+/);
+    const loserParts = (teams[1] ?? '').trim().split(/\s+/);
 
     if (winnerParts.length >= 3) {
-      result.WinnerRank = winnerParts[0];
-      result.WinnerScore = winnerParts[winnerParts.length - 1];
+      result.WinnerRank = winnerParts[0] ?? null;
+      result.WinnerScore = winnerParts[winnerParts.length - 1] ?? null;
       result.Winner = winnerParts.slice(1, -1).join(' ');
     }
 
     if (loserParts.length >= 3) {
-      result.LoserRank = loserParts[0];
-      result.LoserScore = loserParts[loserParts.length - 1];
+      result.LoserRank = loserParts[0] ?? null;
+      result.LoserScore = loserParts[loserParts.length - 1] ?? null;
       result.Loser = loserParts.slice(1, -1).join(' ');
     }
 
@@ -1062,20 +1115,20 @@ export function parseGameResult(gameStr) {
   }
 
   // Try "at" format (away game): "233 Rice at 273 FIU"
-  teams = gameStr.split(' at ');
+  teams = processedStr.split(' at ');
   if (teams.length === 2) {
     result.isAway = true;
 
-    const team1Parts = teams[0].trim().split(/\s+/);
-    const team2Parts = teams[1].trim().split(/\s+/);
+    const team1Parts = (teams[0] ?? '').trim().split(/\s+/);
+    const team2Parts = (teams[1] ?? '').trim().split(/\s+/);
 
     // For upcoming games, no scores - team name is everything after rank
     if (team1Parts.length >= 2) {
-      result.WinnerRank = team1Parts[0]; // Actually just team1's rank
+      result.WinnerRank = team1Parts[0] ?? null; // Actually just team1's rank
       result.Winner = team1Parts.slice(1).join(' ');
     }
     if (team2Parts.length >= 2) {
-      result.LoserRank = team2Parts[0]; // Actually just team2's rank
+      result.LoserRank = team2Parts[0] ?? null; // Actually just team2's rank
       result.Loser = team2Parts.slice(1).join(' ');
     }
 
@@ -1083,19 +1136,19 @@ export function parseGameResult(gameStr) {
   }
 
   // Try "vs." format (neutral game): "233 Rice vs. 273 FIU"
-  teams = gameStr.split(' vs. ');
+  teams = processedStr.split(' vs. ');
   if (teams.length === 2) {
     result.isNeutral = true;
 
-    const team1Parts = teams[0].trim().split(/\s+/);
-    const team2Parts = teams[1].trim().split(/\s+/);
+    const team1Parts = (teams[0] ?? '').trim().split(/\s+/);
+    const team2Parts = (teams[1] ?? '').trim().split(/\s+/);
 
     if (team1Parts.length >= 2) {
-      result.WinnerRank = team1Parts[0];
+      result.WinnerRank = team1Parts[0] ?? null;
       result.Winner = team1Parts.slice(1).join(' ');
     }
     if (team2Parts.length >= 2) {
-      result.LoserRank = team2Parts[0];
+      result.LoserRank = team2Parts[0] ?? null;
       result.Loser = team2Parts.slice(1).join(' ');
     }
 
@@ -1109,7 +1162,7 @@ export function parseGameResult(gameStr) {
  * Parse predicted loser from game string and predicted winner.
  * Matches kenpompy logic for extracting team names.
  */
-function parsePredictedLoser(gameStr, predictedWinner) {
+function parsePredictedLoser(gameStr: string, predictedWinner: string | null): string | null {
   const parsed = parseGameResult(gameStr);
 
   if (!predictedWinner) return null;
@@ -1134,12 +1187,12 @@ function parsePredictedLoser(gameStr, predictedWinner) {
 /**
  * Extract valid team names from homepage.
  *
- * @param {string} html - HTML content
- * @returns {Array<string>} List of team names
+ * @param html - HTML content
+ * @returns List of team names
  */
-export function parseValidTeams(html) {
+export function parseValidTeams(html: string): string[] {
   const $ = cheerio.load(html);
-  const teams = [];
+  const teams: string[] = [];
 
   // Teams are in links to team.php
   $('a[href*="team.php"]').each((i, el) => {
@@ -1160,7 +1213,7 @@ export function parseValidTeams(html) {
 /**
  * Default stats object for scouting report.
  */
-const DEFAULT_SCOUTING_STATS = {
+const DEFAULT_SCOUTING_STATS: ScoutingReportStats = {
   OE: '', 'OE.Rank': '', DE: '', 'DE.Rank': '',
   Tempo: '', 'Tempo.Rank': '', APLO: '', 'APLO.Rank': '', APLD: '', 'APLD.Rank': '',
   eFG: '', 'eFG.Rank': '', DeFG: '', 'DeFG.Rank': '',
@@ -1184,19 +1237,19 @@ const DEFAULT_SCOUTING_STATS = {
  * Parse scouting report from inline JavaScript.
  * Extracts team stats from JavaScript code embedded in the team page.
  *
- * @param {string} html - HTML content
- * @param {boolean} conferenceOnly - Extract only conference stats
- * @returns {Object} Scouting report stats with values and ranks
+ * @param html - HTML content
+ * @param conferenceOnly - Extract only conference stats
+ * @returns Scouting report stats with values and ranks
  */
-export function parseScoutingReport(html, conferenceOnly = false) {
+export function parseScoutingReport(html: string, conferenceOnly: boolean = false): ScoutingReportStats {
   const $ = cheerio.load(html);
-  const stats = { ...DEFAULT_SCOUTING_STATS };
+  const stats: ScoutingReportStats = { ...DEFAULT_SCOUTING_STATS };
 
   // Find inline JavaScript (script without src)
   let scriptContent = '';
   $('script[type="text/javascript"]').each((i, el) => {
     if (!$(el).attr('src')) {
-      scriptContent = $(el).html() || '';
+      scriptContent = $(el).html() ?? '';
       return false; // break
     }
   });
@@ -1205,35 +1258,34 @@ export function parseScoutingReport(html, conferenceOnly = false) {
     return stats;
   }
 
-  // Pattern to extract stat tokens and values
-  const extractionPattern = /\$\("td#([A-Za-z0-9]+)"\)\.html\("(.+?)"\);/g;
-
   // Pattern to find the right function block
   const functionPattern = conferenceOnly
     ? /\$\(':checkbox'\)\.click\(function\(\) \{([^}]+)\}/
     : /function tableStart\(\) \{([^}]+)\}/;
 
   const functionMatch = scriptContent.match(functionPattern);
-  if (!functionMatch) {
+  if (!functionMatch?.[1]) {
     return stats;
   }
 
   const functionBlock = functionMatch[1];
 
   // Extract all stat assignments from the function block
-  let match;
   const statPattern = /\$\("td#([A-Za-z0-9]+)"\)\.html\("(.+?)"\);/g;
+  let match;
 
   while ((match = statPattern.exec(functionBlock)) !== null) {
     const token = match[1];
     const valueHtml = match[2];
+
+    if (!token || !valueHtml) continue;
 
     // Parse the HTML to extract value and rank
     // Format: <a href="...">value</a><span class="seed">rank</span>
     const valueMatch = valueHtml.match(/>([^<]+)<\/a>/);
     const rankMatch = valueHtml.match(/class="seed">(\d+)</);
 
-    if (valueMatch && rankMatch) {
+    if (valueMatch?.[1] && rankMatch?.[1]) {
       const value = parseFloat(valueMatch[1]);
       const rank = parseInt(rankMatch[1]);
 
@@ -1254,19 +1306,19 @@ export function parseScoutingReport(html, conferenceOnly = false) {
 /**
  * Parse conference standings table.
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Conference standings
+ * @param html - HTML content
+ * @returns Conference standings
  */
-export function parseConferenceStandings(html) {
+export function parseConferenceStandings(html: string): ConferenceStandingsData[] {
   const { $, table } = getTable(html, 0);
 
-  const rows = [];
+  const rows: ConferenceStandingsData[] = [];
   const tbody = table.find('tbody');
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
   // Get headers and add .Rank suffix to duplicates
-  const headers = [];
-  table.find('thead tr th, thead tr td').each((i, el) => {
+  const headers: string[] = [];
+  table.find('thead tr th, thead tr td').each((i: number, el: CheerioNode) => {
     let text = $(el).text().trim() || `Column${i}`;
     if (headers.includes(text)) {
       text = `${text}.Rank`;
@@ -1274,26 +1326,27 @@ export function parseConferenceStandings(html) {
     headers.push(text);
   });
 
-  bodyRows.each((i, row) => {
+  bodyRows.each((_i: number, row: CheerioNode) => {
     const cells = $(row).find('td');
     if (cells.length === 0) return;
 
-    const rowData = {};
-    cells.each((j, cell) => {
-      if (j < headers.length) {
-        rowData[headers[j]] = $(cell).text().trim();
+    const rowData: TableRow = {};
+    cells.each((j: number, cell: CheerioNode) => {
+      const header = headers[j];
+      if (header !== undefined) {
+        rowData[header] = $(cell).text().trim();
       }
     });
 
     // Extract seed from team name
-    if (rowData.Team) {
-      const seed = extractSeed(rowData.Team);
-      rowData.Seed = seed || '';
-      rowData.Team = stripSeed(rowData.Team);
+    if (rowData['Team']) {
+      const seed = extractSeed(rowData['Team']);
+      rowData['Seed'] = seed ?? '';
+      rowData['Team'] = stripSeed(rowData['Team']);
     }
 
     if (Object.keys(rowData).length > 0) {
-      rows.push(rowData);
+      rows.push(rowData as ConferenceStandingsData);
     }
   });
 
@@ -1303,10 +1356,10 @@ export function parseConferenceStandings(html) {
 /**
  * Parse conference offense table (index 1).
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Conference offense stats
+ * @param html - HTML content
+ * @returns Conference offense stats
  */
-export function parseConferenceOffense(html) {
+export function parseConferenceOffense(html: string): ConferenceStatsData[] {
   const { $, table } = getTable(html, 1);
   return parseConferenceTable($, table);
 }
@@ -1314,10 +1367,10 @@ export function parseConferenceOffense(html) {
 /**
  * Parse conference defense table (index 2).
  *
- * @param {string} html - HTML content
- * @returns {Array<Object>} Conference defense stats
+ * @param html - HTML content
+ * @returns Conference defense stats
  */
-export function parseConferenceDefense(html) {
+export function parseConferenceDefense(html: string): ConferenceStatsData[] {
   const { $, table } = getTable(html, 2);
   return parseConferenceTable($, table);
 }
@@ -1325,14 +1378,14 @@ export function parseConferenceDefense(html) {
 /**
  * Helper to parse conference offense/defense tables.
  */
-function parseConferenceTable($, table) {
-  const rows = [];
+function parseConferenceTable($: CheerioAPI, table: CheerioElement): ConferenceStatsData[] {
+  const rows: ConferenceStatsData[] = [];
   const tbody = table.find('tbody');
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
   // Get headers and add .Rank suffix to duplicates
-  const headers = [];
-  table.find('thead tr th, thead tr td').each((i, el) => {
+  const headers: string[] = [];
+  table.find('thead tr th, thead tr td').each((i: number, el: CheerioNode) => {
     let text = $(el).text().trim() || `Column${i}`;
     if (headers.includes(text)) {
       text = `${text}.Rank`;
@@ -1340,19 +1393,20 @@ function parseConferenceTable($, table) {
     headers.push(text);
   });
 
-  bodyRows.each((i, row) => {
+  bodyRows.each((_i: number, row: CheerioNode) => {
     const cells = $(row).find('td');
     if (cells.length === 0) return;
 
-    const rowData = {};
-    cells.each((j, cell) => {
-      if (j < headers.length) {
-        rowData[headers[j]] = $(cell).text().trim();
+    const rowData: TableRow = {};
+    cells.each((j: number, cell: CheerioNode) => {
+      const header = headers[j];
+      if (header !== undefined) {
+        rowData[header] = $(cell).text().trim();
       }
     });
 
     if (Object.keys(rowData).length > 0) {
-      rows.push(rowData);
+      rows.push(rowData as ConferenceStatsData);
     }
   });
 
@@ -1363,11 +1417,11 @@ function parseConferenceTable($, table) {
  * Parse conference aggregate stats.
  * Used for both single conference and all conferences.
  *
- * @param {string} html - HTML content
- * @param {boolean} singleConf - Whether parsing single conference page
- * @returns {Array<Object>} Aggregate stats
+ * @param html - HTML content
+ * @param singleConf - Whether parsing single conference page
+ * @returns Aggregate stats
  */
-export function parseConferenceAggregateStats(html, singleConf = false) {
+export function parseConferenceAggregateStats(html: string, singleConf: boolean = false): (ConferenceAggregateData | ConferenceStatsData)[] {
   const $ = cheerio.load(html);
   const tables = $('table');
 
@@ -1382,9 +1436,9 @@ export function parseConferenceAggregateStats(html, singleConf = false) {
 
     // Combine and format
     return [...mainRows, ...pctRows].map(row => ({
-      Stat: row.Stat ? row.Stat.split(' (')[0] : '',
-      Value: row.Value,
-      Rank: row.Rank
+      Stat: row['Stat'] ? row['Stat'].split(' (')[0] ?? '' : '',
+      Value: row['Value'] ?? '',
+      Rank: row['Rank'] ?? ''
     }));
   } else {
     // All conferences: first table from confstats.php
@@ -1396,12 +1450,12 @@ export function parseConferenceAggregateStats(html, singleConf = false) {
 /**
  * Helper to parse conference stats tables (for aggregate).
  */
-function parseConferenceStatsTable($, table) {
-  const rows = [];
+function parseConferenceStatsTable($: CheerioAPI, table: CheerioElement): TableRow[] {
+  const rows: TableRow[] = [];
   const tbody = table.find('tbody');
   const bodyRows = tbody.length > 0 ? tbody.find('tr') : table.find('tr').slice(1);
 
-  bodyRows.each((i, row) => {
+  bodyRows.each((_i: number, row: CheerioNode) => {
     const cells = $(row).find('td');
     if (cells.length < 3) return;
 
