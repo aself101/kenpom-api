@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/aself101/kenpom-api/compare/v2.0.1...v2.0.2) (2025-12-11)
+
+
+### Bug Fixes
+
+* republish with corrected npm token permissions ([f68b48d](https://github.com/aself101/kenpom-api/commit/f68b48dec5a99101e405efa55c2c57e7c774b2cb))
+
 ## [2.0.1](https://github.com/aself101/kenpom-api/compare/v2.0.0...v2.0.1) (2025-12-11)
 
 
