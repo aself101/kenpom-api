@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/aself101/kenpom-api/compare/v1.0.3...v1.0.4) (2025-12-11)
+
+
+### Bug Fixes
+
+* **ci:** add build step before tests for TypeScript compilation ([17d5f13](https://github.com/aself101/kenpom-api/commit/17d5f13393452d411164ef0234b37e0868baeed6))
+
 ## [1.0.3](https://github.com/aself101/kenpom-api/compare/v1.0.2...v1.0.3) (2025-11-27)
 
 
