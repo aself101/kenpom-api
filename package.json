@@ -1,6 +1,6 @@
 {
   "name": "kenpom-api",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "KenPom.com API wrapper - College basketball statistics for Node.js with CLI",
   "main": "dist/api.js",
   "types": "dist/api.d.ts",

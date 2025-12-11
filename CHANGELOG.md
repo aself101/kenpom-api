@@ -1,3 +1,27 @@
+# [2.0.0](https://github.com/aself101/kenpom-api/compare/v1.0.4...v2.0.0) (2025-12-11)
+
+
+### Features
+
+* TypeScript migration with full type definitions ([2208523](https://github.com/aself101/kenpom-api/commit/2208523d98342a8d5c1edc7be6b6699b1b0f932f))
+
+
+### BREAKING CHANGES
+
+* Package now requires Node.js 20+ and uses ESM only.
+
+- Full TypeScript rewrite with strict type checking
+- Comprehensive type exports for all API responses
+- Submodule exports: /config, /utils, /parsers, /types
+- New ProgressReporter utility class
+- 229 tests with 87% coverage
+
+Migration guide available in README.md
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
 ## [1.0.4](https://github.com/aself101/kenpom-api/compare/v1.0.3...v1.0.4) (2025-12-11)
 
 
