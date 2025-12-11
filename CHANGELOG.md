@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/aself101/kenpom-api/compare/v2.0.0...v2.0.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* ensure README with TypeScript documentation is published ([3bcb51d](https://github.com/aself101/kenpom-api/commit/3bcb51d7d541a9d4e73b9ec47e35c9ba683a93f0))
+
 # [2.0.0](https://github.com/aself101/kenpom-api/compare/v1.0.4...v2.0.0) (2025-12-11)
 
 
