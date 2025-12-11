@@ -1,10 +1,11 @@
 # KenPom.com College Basketball Statistics API
 
 [![npm version](https://img.shields.io/npm/v/kenpom-api.svg)](https://www.npmjs.com/package/kenpom-api)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/node/v/kenpom-api)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-203%20passing-brightgreen)](test/)
-[![Coverage](https://img.shields.io/badge/coverage-86.01%25-brightgreen)](test/)
+[![Tests](https://img.shields.io/badge/tests-229%20passing-brightgreen)](test/)
+[![Coverage](https://img.shields.io/badge/coverage-86.98%25-brightgreen)](test/)
 
 A Node.js wrapper for [KenPom.com](https://kenpom.com/) college basketball statistics with CLI support. Scrapes data from KenPom using authenticated HTTP requests with automatic Cloudflare bypass.
 
@@ -54,7 +55,9 @@ await api.close();
 - [Data Organization](#data-organization)
 - [HTTP Client Tiers](#http-client-tiers)
 - [Error Handling](#error-handling)
+- [TypeScript Support](#typescript-support)
 - [Troubleshooting](#troubleshooting)
+- [Migration from v0.x](#migration-from-v0x)
 
 ## Overview
 
@@ -67,7 +70,7 @@ KenPom.com provides the most comprehensive college basketball statistics availab
 - **Season Validation** - Enforces minimum year requirements per endpoint (e.g., player stats require 2004+)
 - **CLI Tool** - Command-line interface with batch processing, year ranges, and dry-run mode
 - **Organized Storage** - Structured directories with timestamped files
-- **Comprehensive Testing** - 203 tests with 82% coverage (api.js: 93%, config.js: 97%)
+- **Comprehensive Testing** - 229 tests with 86.98% coverage (api.ts: 93%, config.ts: 97%)
 
 ## Data Endpoints
 
@@ -813,6 +816,102 @@ await api.getPlayerStats(2003, 'eFG');
 // Error: Season 2003 is not available for PLAYER_STATS. Minimum year: 2004
 ```
 
+## TypeScript Support
+
+This package is written in TypeScript and provides full type definitions out of the box. No additional `@types` packages are required.
+
+### Type Imports
+
+```typescript
+import { KenpomAPI } from 'kenpom-api';
+import type {
+  // API Options
+  KenpomAPIOptions,
+  KenpomCredentials,
+  LogLevel,
+  ClientTier,
+
+  // Data Types
+  PomeroyRating,
+  EfficiencyData,
+  FourFactorsData,
+  TeamStatsData,
+  PlayerStats,
+  ScheduleGame,
+  FanMatchResponse,
+  ScoutingReportStats,
+
+  // Validation Types
+  PlayerMetric,
+  GameAttribMetric,
+  Conference,
+} from 'kenpom-api';
+```
+
+### Typed API Methods
+
+All API methods return properly typed data:
+
+```typescript
+const api = new KenpomAPI();
+await api.login();
+
+// Returns PomeroyRating[]
+const ratings = await api.getPomeroyRatings(2025);
+ratings[0].Team;    // string
+ratings[0].AdjEM;   // string
+ratings[0].Conf;    // string
+
+// Returns FourFactorsData[]
+const factors = await api.getFourFactors(2025);
+factors[0]['Off-eFG%'];  // string
+
+// Returns ScheduleGame[]
+const schedule = await api.getSchedule('Duke', 2025);
+schedule[0].Result;      // string
+schedule[0].Location;    // string
+
+await api.close();
+```
+
+### Submodule Exports
+
+Type-safe access to configuration and utilities:
+
+```typescript
+// Configuration constants and validators
+import {
+  PLAYER_METRICS,
+  GAME_ATTRIB_METRICS,
+  CONFERENCES,
+  validatePlayerMetric,
+  validateConference,
+  validateSeason,
+} from 'kenpom-api/config';
+
+// Utility functions
+import {
+  writeToFile,
+  readFromFile,
+  generateYearRange,
+  generateDateRange,
+} from 'kenpom-api/utils';
+
+// HTML parsers (advanced usage)
+import {
+  parsePomeroyRatings,
+  parseFourFactors,
+  parseSchedule,
+} from 'kenpom-api/parsers';
+
+// Type definitions only
+import type { PlayerMetric, Conference } from 'kenpom-api/types';
+```
+
+### Strict Type Checking
+
+The package is compiled with strict TypeScript settings. All exported types are accurate and reflect the actual data structures returned by the KenPom.com website.
+
 ## Troubleshooting
 
 ### Credentials Not Found
@@ -892,17 +991,17 @@ node cli.js --ratings --year 2025 --dry-run
 ### Testing
 
 ```bash
-npm test                  # Run all 203 tests with Vitest
+npm test                  # Run all 229 tests with Vitest
 npm run test:watch        # Watch mode for development
-npm run test:coverage     # Generate coverage report (82% overall)
+npm run test:coverage     # Generate coverage report (86.98% overall)
 ```
 
 **Test Coverage:**
-- Overall: 82.04% lines, 69.37% branches
-- api.js: 93.02% lines (authentication, all endpoints)
-- config.js: 97.05% lines (validation, configuration)
-- parsers.js: 86% lines (HTML parsing)
-- utils.js: 72.05% lines (file I/O, HTTP clients)
+- Overall: 86.98% lines, 68.54% branches
+- api.ts: 93.25% lines (authentication, all endpoints)
+- config.ts: 96.87% lines (validation, configuration)
+- parsers.ts: 86.57% lines (HTML parsing)
+- utils.ts: 85.47% lines (file I/O, HTTP clients)
 
 ### npm Scripts
 
@@ -954,6 +1053,51 @@ This package includes built-in rate limiting (2-7 second delays between requests
 - **Follow terms of service** - Comply with KenPom.com's usage policies
 
 Abuse of this package (e.g., excessive scraping, circumventing access controls) may result in your account being suspended or banned from KenPom.com. The maintainers of this package are not responsible for any consequences arising from misuse. Let's try and be decent with this.
+
+## Migration from v0.x
+
+Version 1.0 represents a complete rewrite from JavaScript to TypeScript. If you're upgrading from v0.x, note the following changes:
+
+### Breaking Changes
+
+1. **ESM Only** - The package now uses ES modules exclusively. Update your imports:
+   ```javascript
+   // Before (CommonJS)
+   const { KenpomAPI } = require('kenpom-api');
+
+   // After (ESM)
+   import { KenpomAPI } from 'kenpom-api';
+   ```
+
+2. **Node.js 20+** - Minimum Node.js version is now 20.18.0 (up from 14.x).
+
+3. **Async/Await Required** - All API methods now return Promises. The callback-style API has been removed.
+
+### New Features in v1.0
+
+- **Full TypeScript Support** - Comprehensive type definitions for all API methods and data structures
+- **Submodule Exports** - Direct access to `/config`, `/utils`, `/parsers`, and `/types`
+- **Improved Error Messages** - All errors now include actionable information (what's wrong + how to fix)
+- **CLI Enhancements** - Dynamic version from package.json, `--examples` flag, improved dry-run output
+- **Better Test Coverage** - 229 tests with 87% coverage
+
+### API Compatibility
+
+The core API surface remains the same. Method names, parameters, and return structures are unchanged:
+
+```typescript
+// Same API as v0.x, now with types
+const api = new KenpomAPI();
+await api.login();
+const ratings = await api.getPomeroyRatings(2025);
+await api.close();
+```
+
+### Deprecated Features
+
+- Callback-style API (use async/await instead)
+- CommonJS imports (use ESM imports instead)
+- Node.js < 20 support
 
 ## License
 

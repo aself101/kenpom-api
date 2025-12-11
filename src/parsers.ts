@@ -149,7 +149,10 @@ export function parsePomeroyRatings(html: string): PomeroyRating[] {
 
   const rows = extractRows($, table, columns);
 
-  // Post-process: filter headers, extract seed, clean team name
+  // Post-process: filter and transform rows
+  // - KenPom tables have repeated header rows in tbody (Rk === 'Rk')
+  // - Empty Rk values indicate invalid/partial rows
+  // - Team names include seed suffix (e.g., "Duke 1") that needs extraction
   return rows
     .filter(row => row['Rk'] !== 'Rk' && row['Rk'] !== '')
     .map(row => {
@@ -177,7 +180,9 @@ export function parsePomeroyRatings(html: string): PomeroyRating[] {
 export function parseEfficiency(html: string, season: number | null): EfficiencyData[] {
   const { $, table } = getTable(html, 0);
 
-  // Column names depend on year - KenPom added Avg.Poss.Length columns in 2010
+  // Column structure changed in 2010 when KenPom added Average Possession Length metrics
+  // Pre-2010: 14 columns (Tempo + Efficiency only)
+  // 2010+:    18 columns (adds Avg.Poss.Length-Off/Def with ranks)
   let columns: string[];
   if (season && season < 2010) {
     columns = [
@@ -369,10 +374,14 @@ export function parseHeight(html: string, season: number | null): HeightData[] {
 export function parsePlayerStats(html: string, metric: string = 'eFG'): PlayerStats[] {
   const { $, table } = getTable(html, 0);
 
-  // Base columns
+  // Column structure depends on metric type:
+  // - Base columns: Rank, Player, Team (always present)
+  // - FG metrics (2P, 3P, FT): expand to Made/Attempted/Pct columns
+  // - ORtg: special case with "(Poss%)" embedded in value
+  // - Other metrics: single value column
   const columns: string[] = ['Rank', 'Player', 'Team'];
 
-  // Handle FG metrics that have Made/Attempted/Pct
+  // FG metrics show Made/Attempted/Percentage breakdown
   const fgMetrics = ['2P', '3P', 'FT'];
   if (fgMetrics.includes(metric)) {
     columns.push(`${metric}M`, `${metric}A`, `${metric}%`);

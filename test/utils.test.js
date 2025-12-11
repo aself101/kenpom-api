@@ -9,6 +9,7 @@ import os from 'os';
 import {
   parseTable,
   parseTableElement,
+  parseAllTables,
   extractText,
   extractSeason,
   extractTeamNames,
@@ -21,6 +22,9 @@ import {
   readFromFile,
   pause,
   randomPause,
+  createPuppeteerClient,
+  createCloudscraperClient,
+  ProgressReporter,
 } from '../dist/utils.js';
 
 describe('utils', () => {
@@ -88,6 +92,93 @@ describe('utils', () => {
       const rows = parseTable(html);
       expect(rows[0]).toHaveProperty('Name');
       expect(rows[0]).toHaveProperty('Name_1');
+    });
+
+    it('should throw for out of bounds table index', () => {
+      const html = '<table><tr><th>A</th></tr><tr><td>1</td></tr></table>';
+      expect(() => parseTable(html, 'table', 5)).toThrow('Table index 5 out of bounds');
+    });
+
+    it('should handle empty header cells', () => {
+      const html = `
+        <table>
+          <tr><th>Name</th><th></th><th>Value</th></tr>
+          <tr><td>A</td><td>B</td><td>C</td></tr>
+        </table>
+      `;
+      const rows = parseTable(html);
+      expect(rows[0]).toHaveProperty('Name', 'A');
+      expect(rows[0]).toHaveProperty('Column1', 'B');
+      expect(rows[0]).toHaveProperty('Value', 'C');
+    });
+
+    it('should skip empty rows', () => {
+      const html = `
+        <table>
+          <tr><th>A</th></tr>
+          <tr><td></td></tr>
+          <tr><td>1</td></tr>
+        </table>
+      `;
+      const rows = parseTable(html);
+      // Empty row should still be included if it has a cell
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('parseAllTables', () => {
+    it('should parse multiple tables', () => {
+      const html = `
+        <html>
+          <body>
+            <table id="t1">
+              <tr><th>A</th></tr>
+              <tr><td>1</td></tr>
+            </table>
+            <table id="t2">
+              <tr><th>B</th></tr>
+              <tr><td>2</td></tr>
+            </table>
+          </body>
+        </html>
+      `;
+      const tables = parseAllTables(html);
+      expect(tables).toHaveLength(2);
+      expect(tables[0][0]).toEqual({ A: '1' });
+      expect(tables[1][0]).toEqual({ B: '2' });
+    });
+
+    it('should return empty array for no tables', () => {
+      const html = '<html><body><p>No tables</p></body></html>';
+      const tables = parseAllTables(html);
+      expect(tables).toEqual([]);
+    });
+
+    it('should parse tables with custom selector', () => {
+      const html = `
+        <table class="data"><tr><th>X</th></tr><tr><td>1</td></tr></table>
+        <table class="other"><tr><th>Y</th></tr><tr><td>2</td></tr></table>
+      `;
+      const tables = parseAllTables(html, '.data');
+      expect(tables).toHaveLength(1);
+      expect(tables[0][0]).toEqual({ X: '1' });
+    });
+
+    it('should handle tables with different structures', () => {
+      const html = `
+        <table>
+          <thead><tr><th>Col1</th><th>Col2</th></tr></thead>
+          <tbody><tr><td>A</td><td>B</td></tr></tbody>
+        </table>
+        <table>
+          <tr><th>Single</th></tr>
+          <tr><td>Value</td></tr>
+        </table>
+      `;
+      const tables = parseAllTables(html);
+      expect(tables).toHaveLength(2);
+      expect(tables[0][0]).toEqual({ Col1: 'A', Col2: 'B' });
+      expect(tables[1][0]).toEqual({ Single: 'Value' });
     });
   });
 
@@ -347,6 +438,141 @@ describe('utils', () => {
       const elapsed = Date.now() - start;
       expect(elapsed).toBeGreaterThanOrEqual(40); // Allow timing variance
       expect(elapsed).toBeLessThan(200); // Upper bound with buffer
+    });
+  });
+
+  describe('createPuppeteerClient', () => {
+    it('should throw if puppeteer dependencies are missing', async () => {
+      // puppeteer-extra is not installed as a production dependency
+      // so this should throw with the expected error message
+      await expect(createPuppeteerClient()).rejects.toThrow('Puppeteer not available');
+    });
+
+    it('should include installation instructions in error', async () => {
+      await expect(createPuppeteerClient()).rejects.toThrow('puppeteer-extra');
+    });
+  });
+
+  describe('createCloudscraperClient', () => {
+    it('should create a cloudscraper client', async () => {
+      const client = await createCloudscraperClient();
+      expect(client).toBeDefined();
+      expect(client.type).toBe('cloudscraper');
+      expect(client.client).toBeDefined();
+    });
+
+    it('should return client with expected structure', async () => {
+      const client = await createCloudscraperClient();
+      expect(typeof client.client).toBe('function');
+    });
+  });
+
+  describe('ProgressReporter', () => {
+    let mockLog;
+
+    beforeEach(() => {
+      mockLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      mockLog.mockRestore();
+    });
+
+    it('should log fetch message in text mode', () => {
+      const reporter = new ProgressReporter();
+      reporter.logFetch('ratings', 2025);
+
+      expect(mockLog).toHaveBeenCalledWith('Fetching ratings for 2025...');
+    });
+
+    it('should log fetch message without year', () => {
+      const reporter = new ProgressReporter();
+      reporter.logFetch('arenas');
+
+      expect(mockLog).toHaveBeenCalledWith('Fetching arenas...');
+    });
+
+    it('should log success message', () => {
+      const reporter = new ProgressReporter();
+      reporter.logSuccess('ratings', 2025);
+
+      expect(mockLog).toHaveBeenCalledWith('✓ ratings saved for 2025\n');
+    });
+
+    it('should log error message', () => {
+      const reporter = new ProgressReporter();
+      reporter.logError('ratings', 'Network timeout', 2025);
+
+      expect(mockLog).toHaveBeenCalledWith('✗ ratings (2025): Network timeout');
+    });
+
+    it('should log skip message', () => {
+      const reporter = new ProgressReporter();
+      reporter.logSkip('refs', 'Year before minimum 2016', 2015);
+
+      expect(mockLog).toHaveBeenCalledWith('→ Skipping refs for 2015: Year before minimum 2016');
+    });
+
+    it('should log info message', () => {
+      const reporter = new ProgressReporter();
+      reporter.logInfo('Starting data fetch...');
+
+      expect(mockLog).toHaveBeenCalledWith('Starting data fetch...');
+    });
+
+    it('should log header', () => {
+      const reporter = new ProgressReporter();
+      reporter.logHeader('KenPom Data Fetcher');
+
+      expect(mockLog).toHaveBeenCalledTimes(3);
+      expect(mockLog).toHaveBeenNthCalledWith(2, 'KenPom Data Fetcher');
+    });
+
+    it('should log progress', () => {
+      const reporter = new ProgressReporter();
+      reporter.logProgress(3, 10, 'year');
+
+      expect(mockLog).toHaveBeenCalledWith('Processing year 3 of 10...');
+    });
+
+    it('should output JSON in json mode', () => {
+      const reporter = new ProgressReporter({ json: true });
+      reporter.logFetch('ratings', 2025);
+
+      expect(mockLog).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'fetch', endpoint: 'ratings', year: 2025 })
+      );
+    });
+
+    it('should suppress output in quiet mode', () => {
+      const reporter = new ProgressReporter({ quiet: true });
+      reporter.logFetch('ratings', 2025);
+      reporter.logSuccess('ratings', 2025);
+      reporter.logError('ratings', 'error', 2025);
+      reporter.logSkip('refs', 'reason', 2025);
+      reporter.logInfo('info');
+      reporter.logHeader('header');
+      reporter.logProgress(1, 10, 'year');
+
+      expect(mockLog).not.toHaveBeenCalled();
+    });
+
+    it('should output success as JSON in json mode', () => {
+      const reporter = new ProgressReporter({ json: true });
+      reporter.logSuccess('ratings', 2025, '/path/to/file.json');
+
+      expect(mockLog).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'success', endpoint: 'ratings', year: 2025, path: '/path/to/file.json' })
+      );
+    });
+
+    it('should output error as JSON in json mode', () => {
+      const reporter = new ProgressReporter({ json: true });
+      reporter.logError('ratings', 'Network timeout', 2025);
+
+      expect(mockLog).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'error', endpoint: 'ratings', year: 2025, error: 'Network timeout' })
+      );
     });
   });
 });

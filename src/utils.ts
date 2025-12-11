@@ -493,3 +493,149 @@ export function ncaamStartDate(season: number): string {
 export function ncaamEndDate(season: number): string {
   return `${season}-04-30`;
 }
+
+// ============================================================================
+// PROGRESS REPORTER
+// ============================================================================
+
+/**
+ * Progress reporter for CLI output.
+ * Provides consistent formatting for fetch operations with optional
+ * JSON output mode for programmatic consumption.
+ */
+export class ProgressReporter {
+  private jsonMode: boolean;
+  private quiet: boolean;
+
+  /**
+   * Create a progress reporter.
+   *
+   * @param options - Reporter options
+   * @param options.json - Output as JSON instead of human-readable text
+   * @param options.quiet - Suppress all output
+   */
+  constructor(options: { json?: boolean; quiet?: boolean } = {}) {
+    this.jsonMode = options.json ?? false;
+    this.quiet = options.quiet ?? false;
+  }
+
+  /**
+   * Log start of a fetch operation.
+   *
+   * @param endpoint - Endpoint name being fetched
+   * @param year - Optional year being fetched
+   */
+  logFetch(endpoint: string, year?: number): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'fetch', endpoint, year }));
+    } else {
+      const yearStr = year ? ` for ${year}` : '';
+      console.log(`Fetching ${endpoint}${yearStr}...`);
+    }
+  }
+
+  /**
+   * Log successful completion.
+   *
+   * @param endpoint - Endpoint name that was saved
+   * @param year - Optional year that was saved
+   * @param path - Optional file path where data was saved
+   */
+  logSuccess(endpoint: string, year?: number, path?: string): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'success', endpoint, year, path }));
+    } else {
+      const yearStr = year ? ` for ${year}` : '';
+      console.log(`✓ ${endpoint} saved${yearStr}\n`);
+    }
+  }
+
+  /**
+   * Log an error.
+   *
+   * @param endpoint - Endpoint name that failed
+   * @param error - Error message
+   * @param year - Optional year that failed
+   */
+  logError(endpoint: string, error: string, year?: number): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'error', endpoint, year, error }));
+    } else {
+      const yearStr = year ? ` (${year})` : '';
+      console.log(`✗ ${endpoint}${yearStr}: ${error}`);
+    }
+  }
+
+  /**
+   * Log a skip message (e.g., year before minimum).
+   *
+   * @param endpoint - Endpoint name being skipped
+   * @param reason - Reason for skipping
+   * @param year - Optional year being skipped
+   */
+  logSkip(endpoint: string, reason: string, year?: number): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'skip', endpoint, year, reason }));
+    } else {
+      const yearStr = year ? ` for ${year}` : '';
+      console.log(`→ Skipping ${endpoint}${yearStr}: ${reason}`);
+    }
+  }
+
+  /**
+   * Log an info message.
+   *
+   * @param message - Message to log
+   */
+  logInfo(message: string): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'info', message }));
+    } else {
+      console.log(message);
+    }
+  }
+
+  /**
+   * Log a section header.
+   *
+   * @param title - Section title
+   */
+  logHeader(title: string): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'header', title }));
+    } else {
+      console.log('='.repeat(80));
+      console.log(title);
+      console.log('='.repeat(80));
+    }
+  }
+
+  /**
+   * Log a progress update (e.g., "Processing year 3 of 10").
+   *
+   * @param current - Current item number
+   * @param total - Total number of items
+   * @param description - What is being processed
+   */
+  logProgress(current: number, total: number, description: string): void {
+    if (this.quiet) return;
+
+    if (this.jsonMode) {
+      console.log(JSON.stringify({ event: 'progress', current, total, description }));
+    } else {
+      console.log(`Processing ${description} ${current} of ${total}...`);
+    }
+  }
+}
