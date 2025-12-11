@@ -3,10 +3,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { KenpomAPI } from '../api.js';
+import { KenpomAPI } from '../dist/api.js';
 
 // Mock utils module
-vi.mock('../utils.js', () => ({
+vi.mock('../dist/utils.js', () => ({
   parseTable: vi.fn(() => [{ team: 'Duke', rank: 1 }]),
   parseAllTables: vi.fn(() => [[{ team: 'Duke' }], [{ team: 'UNC' }]]),
   extractText: vi.fn(() => 'sample text'),
@@ -19,7 +19,7 @@ vi.mock('../utils.js', () => ({
 }));
 
 // Mock parsers module
-vi.mock('../parsers.js', () => ({
+vi.mock('../dist/parsers.js', () => ({
   parsePomeroyRatings: vi.fn(() => [{ Rk: '1', Team: 'Duke', Conf: 'ACC', Seed: '1' }]),
   parseEfficiency: vi.fn(() => [{ Team: 'Duke', Conference: 'ACC' }]),
   parseFourFactors: vi.fn(() => [{ Team: 'Duke', Conference: 'ACC', AdjTempo: '70.5' }]),
@@ -46,7 +46,7 @@ vi.mock('../parsers.js', () => ({
 }));
 
 // Mock config module partially (keep validators)
-vi.mock('../config.js', async (importOriginal) => {
+vi.mock('../dist/config.js', async (importOriginal) => {
   const original = await importOriginal();
   return {
     ...original,
@@ -157,13 +157,13 @@ describe('KenpomAPI', () => {
       api.client = {};
       api.clientType = 'unknown';
 
-      await expect(api._getHtml('https://kenpom.com/test')).rejects.toThrow('Unknown client type: unknown');
+      await expect(api._getHtml('https://kenpom.com/test')).rejects.toThrow("Unknown client type: 'unknown'. This is an internal error");
     });
   });
 
   describe('login', () => {
     it('should try tiers in order when auto', async () => {
-      const { createCloudscraperClient, createPuppeteerClient } = await import('../utils.js');
+      const { createCloudscraperClient, createPuppeteerClient } = await import('../dist/utils.js');
 
       // First tier fails
       createCloudscraperClient.mockRejectedValueOnce(new Error('Cloudscraper failed'));
@@ -191,7 +191,7 @@ describe('KenpomAPI', () => {
     });
 
     it('should use only specified tier when not auto', async () => {
-      const { createPuppeteerClient } = await import('../utils.js');
+      const { createPuppeteerClient } = await import('../dist/utils.js');
 
       const mockPage = {
         goto: vi.fn(),
@@ -214,7 +214,7 @@ describe('KenpomAPI', () => {
     });
 
     it('should throw if all tiers fail', async () => {
-      const { createCloudscraperClient, createPuppeteerClient } = await import('../utils.js');
+      const { createCloudscraperClient, createPuppeteerClient } = await import('../dist/utils.js');
 
       createCloudscraperClient.mockRejectedValueOnce(new Error('Cloudscraper failed'));
       createPuppeteerClient.mockRejectedValueOnce(new Error('Puppeteer failed'));
@@ -225,7 +225,7 @@ describe('KenpomAPI', () => {
 
   describe('_loginWithTier', () => {
     it('should throw for unknown tier', async () => {
-      await expect(api._loginWithTier('invalid')).rejects.toThrow('Unknown client tier: invalid');
+      await expect(api._loginWithTier('invalid')).rejects.toThrow("Unknown client tier: 'invalid'. Valid tiers are:");
     });
   });
 
@@ -522,7 +522,7 @@ describe('KenpomAPI', () => {
       });
 
       it('should throw if season cannot be determined', async () => {
-        const { extractSeason } = await import('../utils.js');
+        const { extractSeason } = await import('../dist/utils.js');
         extractSeason.mockReturnValueOnce(null);
 
         await expect(api.getCurrentSeason()).rejects.toThrow('Could not determine current season');

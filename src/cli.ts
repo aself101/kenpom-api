@@ -28,10 +28,11 @@ import {
   ncaamEndDate,
   randomPause,
 } from './utils.js';
+import type { CliOptions, GameAttribMetric } from './types.js';
 
 // Dynamic version import to prevent drift between package.json and CLI
 const require = createRequire(import.meta.url);
-const { version } = require('./package.json');
+const { version } = require('../package.json') as { version: string };
 
 const DEFAULT_DATA_DIR = 'datasets';
 
@@ -119,7 +120,7 @@ program
 
 program.parse();
 
-const opts = program.opts();
+const opts = program.opts() as CliOptions;
 
 // ============================================================================
 // SHOW EXAMPLES
@@ -180,7 +181,7 @@ Valid Conferences:
 // MAIN EXECUTION
 // ============================================================================
 
-async function main() {
+async function main(): Promise<void> {
   // Validate arguments
   if ((opts.start && !opts.end) || (!opts.start && opts.end)) {
     console.error('Error: --start and --end must be used together');
@@ -240,7 +241,7 @@ async function main() {
   }
 
   // Determine year range
-  let yearRange = [];
+  let yearRange: number[] = [];
   let modeDesc = '';
 
   if (opts.year) {
@@ -301,14 +302,25 @@ async function main() {
 
   // Initialize API
   console.log('Initializing KenpomAPI...');
-  const api = new KenpomAPI({
-    logLevel: opts.logLevel,
-    clientTier: opts.client,
-  });
+  // Build options object, only including defined values to satisfy exactOptionalPropertyTypes
+  const apiOptions: {
+    logLevel?: string;
+    clientTier?: 'tier1' | 'tier2' | 'auto';
+  } = {};
+  if (opts.logLevel !== undefined) {
+    apiOptions.logLevel = opts.logLevel;
+  }
+  if (opts.client !== undefined) {
+    apiOptions.clientTier = opts.client as 'tier1' | 'tier2' | 'auto';
+  }
+  const api = new KenpomAPI(apiOptions);
 
   try {
     await api.login();
     console.log('✓ Logged in to KenPom\n');
+
+    const outputDir = opts.outputDir ?? DEFAULT_DATA_DIR;
+    const metric = opts.metric ?? 'eFG';
 
     // ========================================================================
     // SINGLE-FETCH ENDPOINTS
@@ -317,7 +329,7 @@ async function main() {
     if (opts.arenas) {
       console.log('Fetching arenas...');
       const data = await api.getArenas();
-      writeToFile(data, `${opts.outputDir}/arenas/arenas.json`);
+      writeToFile(data, `${outputDir}/arenas/arenas.json`);
       console.log('✓ Arenas saved\n');
       await randomPause(2000, 7000);
     }
@@ -325,7 +337,7 @@ async function main() {
     if (opts.programRatings) {
       console.log('Fetching program ratings...');
       const data = await api.getProgramRatings();
-      writeToFile(data, `${opts.outputDir}/program_ratings/program_ratings.json`);
+      writeToFile(data, `${outputDir}/program_ratings/program_ratings.json`);
       console.log('✓ Program ratings saved\n');
       await randomPause(2000, 7000);
     }
@@ -333,7 +345,7 @@ async function main() {
     if (opts.trends) {
       console.log('Fetching trends...');
       const data = await api.getTrends();
-      writeToFile(data, `${opts.outputDir}/trends/trends.json`);
+      writeToFile(data, `${outputDir}/trends/trends.json`);
       console.log('✓ Trends saved\n');
       await randomPause(2000, 7000);
     }
@@ -341,7 +353,7 @@ async function main() {
     if (opts.hca) {
       console.log('Fetching home court advantage...');
       const data = await api.getHca();
-      writeToFile(data, `${opts.outputDir}/hca/hca.json`);
+      writeToFile(data, `${outputDir}/hca/hca.json`);
       console.log('✓ HCA saved\n');
       await randomPause(2000, 7000);
     }
@@ -352,9 +364,9 @@ async function main() {
       try {
         const data = await api.getFanMatch(date);
         const year = date.substring(0, 4);
-        writeToFile(data, `${opts.outputDir}/fanmatch/${year}/fanmatch_${date}.json`);
-        console.log(`✓ FanMatch saved for ${date} (${data.games?.length || 0} games)\n`);
-      } catch (e) {
+        writeToFile(data, `${outputDir}/fanmatch/${year}/fanmatch_${date}.json`);
+        console.log(`✓ FanMatch saved for ${date} (${data.games?.length ?? 0} games)\n`);
+      } catch {
         console.log(`✗ No FanMatch data for ${date}\n`);
       }
       await randomPause(2000, 7000);
@@ -370,7 +382,7 @@ async function main() {
       if (opts.ratings) {
         console.log(`Fetching ratings for ${year}...`);
         const data = await api.getPomeroyRatings(year);
-        writeToFile(data, `${opts.outputDir}/ratings/ratings_${year}.json`);
+        writeToFile(data, `${outputDir}/ratings/ratings_${year}.json`);
         console.log(`✓ Ratings saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -378,7 +390,7 @@ async function main() {
       if (opts.efficiency) {
         console.log(`Fetching efficiency for ${year}...`);
         const data = await api.getEfficiency(year);
-        writeToFile(data, `${opts.outputDir}/efficiency/efficiency_${year}.json`);
+        writeToFile(data, `${outputDir}/efficiency/efficiency_${year}.json`);
         console.log(`✓ Efficiency saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -386,7 +398,7 @@ async function main() {
       if (opts.fourFactors) {
         console.log(`Fetching four factors for ${year}...`);
         const data = await api.getFourFactors(year);
-        writeToFile(data, `${opts.outputDir}/four_factors/four_factors_${year}.json`);
+        writeToFile(data, `${outputDir}/four_factors/four_factors_${year}.json`);
         console.log(`✓ Four factors saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -395,7 +407,7 @@ async function main() {
         console.log(`Fetching team stats for ${year}...`);
         const data = await api.getTeamStats(year, opts.defense);
         const suffix = opts.defense ? '_defense' : '';
-        writeToFile(data, `${opts.outputDir}/team_stats/team_stats${suffix}_${year}.json`);
+        writeToFile(data, `${outputDir}/team_stats/team_stats${suffix}_${year}.json`);
         console.log(`✓ Team stats saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -403,7 +415,7 @@ async function main() {
       if (opts.pointDist) {
         console.log(`Fetching point distribution for ${year}...`);
         const data = await api.getPointDist(year);
-        writeToFile(data, `${opts.outputDir}/point_dist/point_dist_${year}.json`);
+        writeToFile(data, `${outputDir}/point_dist/point_dist_${year}.json`);
         console.log(`✓ Point distribution saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -411,7 +423,7 @@ async function main() {
       if (opts.height && year >= 2007) {
         console.log(`Fetching height/experience for ${year}...`);
         const data = await api.getHeight(year);
-        writeToFile(data, `${opts.outputDir}/height/height_${year}.json`);
+        writeToFile(data, `${outputDir}/height/height_${year}.json`);
         console.log(`✓ Height saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -420,12 +432,12 @@ async function main() {
         if (opts.allMetrics) {
           console.log(`Fetching all player metrics for ${year}...`);
           const data = await api.getAllPlayerStats(year, opts.conference);
-          writeToFile(data, `${opts.outputDir}/player_stats/player_stats_${year}.json`);
+          writeToFile(data, `${outputDir}/player_stats/player_stats_${year}.json`);
           console.log(`✓ All player metrics saved for ${year}`);
         } else {
-          console.log(`Fetching player stats (${opts.metric}) for ${year}...`);
-          const data = await api.getPlayerStats(year, opts.metric, opts.conference);
-          writeToFile(data, `${opts.outputDir}/player_stats/player_stats_${opts.metric}_${year}.json`);
+          console.log(`Fetching player stats (${metric}) for ${year}...`);
+          const data = await api.getPlayerStats(year, metric as typeof PLAYER_METRICS[number], opts.conference);
+          writeToFile(data, `${outputDir}/player_stats/player_stats_${metric}_${year}.json`);
           console.log(`✓ Player stats saved for ${year}`);
         }
         await randomPause(2000, 7000);
@@ -434,7 +446,7 @@ async function main() {
       if (opts.kpoy && year >= 2011) {
         console.log(`Fetching KPOY for ${year}...`);
         const data = await api.getKpoy(year);
-        writeToFile(data, `${opts.outputDir}/kpoy/kpoy_${year}.json`);
+        writeToFile(data, `${outputDir}/kpoy/kpoy_${year}.json`);
         console.log(`✓ KPOY saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -442,17 +454,19 @@ async function main() {
       if (opts.refs && year >= 2016) {
         console.log(`Fetching refs for ${year}...`);
         const data = await api.getRefs(year);
-        writeToFile(data, `${opts.outputDir}/refs/refs_${year}.json`);
+        writeToFile(data, `${outputDir}/refs/refs_${year}.json`);
         console.log(`✓ Refs saved for ${year}`);
         await randomPause(2000, 7000);
       }
 
       if (opts.gameAttribs && year >= 2010) {
         // Use 'Excitement' as default for game-attribs since 'eFG' is only valid for player-stats
-        const gameMetric = GAME_ATTRIB_METRICS.includes(opts.metric) ? opts.metric : 'Excitement';
+        const gameMetric: GameAttribMetric = GAME_ATTRIB_METRICS.includes(metric as GameAttribMetric)
+          ? (metric as GameAttribMetric)
+          : 'Excitement';
         console.log(`Fetching game attributes for ${year}...`);
         const data = await api.getGameAttribs(year, gameMetric);
-        writeToFile(data, `${opts.outputDir}/game_attribs/game_attribs_${year}.json`);
+        writeToFile(data, `${outputDir}/game_attribs/game_attribs_${year}.json`);
         console.log(`✓ Game attributes saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -460,7 +474,7 @@ async function main() {
       if (opts.validTeams) {
         console.log(`Fetching valid teams for ${year}...`);
         const data = await api.getValidTeams(year);
-        writeToFile(data, `${opts.outputDir}/valid_teams/valid_teams_${year}.json`);
+        writeToFile(data, `${outputDir}/valid_teams/valid_teams_${year}.json`);
         console.log(`✓ Valid teams saved for ${year}`);
         await randomPause(2000, 7000);
       }
@@ -474,7 +488,7 @@ async function main() {
           // Single team
           console.log(`Fetching schedule for ${opts.team} (${year})...`);
           const data = await api.getSchedule(opts.team, year);
-          writeToFile(data, `${opts.outputDir}/schedule/${year}/${opts.team}_schedule_${year}.json`);
+          writeToFile(data, `${outputDir}/schedule/${year}/${opts.team}_schedule_${year}.json`);
           console.log(`✓ Schedule saved for ${opts.team}`);
           await randomPause(2000, 7000);
         } else {
@@ -487,11 +501,11 @@ async function main() {
           for (const team of teams) {
             try {
               const data = await api.getSchedule(team, year);
-              writeToFile(data, `${opts.outputDir}/schedule/${year}/${team}_schedule_${year}.json`);
+              writeToFile(data, `${outputDir}/schedule/${year}/${team}_schedule_${year}.json`);
               console.log(`✓ ${team}`);
               await randomPause(2000, 7000);
             } catch (e) {
-              console.log(`✗ ${team}: ${e.message}`);
+              console.log(`✗ ${team}: ${(e as Error).message}`);
             }
           }
         }
@@ -512,11 +526,11 @@ async function main() {
           try {
             const data = await api.getFanMatch(date);
             if (data.games && data.games.length > 0) {
-              writeToFile(data, `${opts.outputDir}/fanmatch/${year}/fanmatch_${date}.json`);
+              writeToFile(data, `${outputDir}/fanmatch/${year}/fanmatch_${date}.json`);
               console.log(`✓ ${date} (${data.games.length} games)`);
             }
             await randomPause(2000, 7000);
-          } catch (e) {
+          } catch {
             // Skip dates with no games
           }
         }
@@ -529,9 +543,9 @@ async function main() {
     console.log('='.repeat(80));
 
   } catch (error) {
-    console.error(`\n✗ Error: ${error.message}`);
+    console.error(`\n✗ Error: ${(error as Error).message}`);
     if (opts.logLevel === 'DEBUG') {
-      console.error(error.stack);
+      console.error((error as Error).stack);
     }
     process.exit(1);
   } finally {

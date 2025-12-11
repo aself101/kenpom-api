@@ -9,9 +9,36 @@ import dotenv from 'dotenv';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import type {
+  KenpomCredentials,
+  CredentialOptions,
+  Endpoints,
+  MinSeasons,
+  EndpointKey,
+  QueryParams,
+} from './types.js';
+
+// Re-export types that are also used as runtime values
+export {
+  PLAYER_METRICS,
+  GAME_ATTRIB_METRICS,
+  CONFERENCES,
+} from './types.js';
+
+import {
+  PLAYER_METRICS,
+  GAME_ATTRIB_METRICS,
+  CONFERENCES,
+} from './types.js';
+
+import type {
+  PlayerMetric,
+  GameAttribMetric,
+  Conference,
+} from './types.js';
 
 // Load environment variables from multiple locations (in priority order)
-function loadEnvFiles() {
+function loadEnvFiles(): void {
   // 1. Local .env file (highest priority)
   dotenv.config();
 
@@ -38,7 +65,7 @@ export const BASE_URL = 'https://kenpom.com';
  * KenPom endpoint URL patterns.
  * Query parameters are added dynamically based on the method.
  */
-export const ENDPOINTS = {
+export const ENDPOINTS: Endpoints = {
   // Authentication
   INDEX: '/index.php',
   LOGIN_HANDLER: '/handlers/login_handler.php',
@@ -81,7 +108,7 @@ export const ENDPOINTS = {
  * Minimum season years for each endpoint.
  * Some data is not available before certain years.
  */
-export const MIN_SEASONS = {
+export const MIN_SEASONS: MinSeasons = {
   POMEROY_RATINGS: 1999,
   EFFICIENCY: 1999,
   FOUR_FACTORS: 1999,
@@ -99,37 +126,6 @@ export const MIN_SEASONS = {
 };
 
 // ============================================================================
-// VALID PARAMETER VALUES
-// ============================================================================
-
-/**
- * Valid metrics for player stats endpoint.
- */
-export const PLAYER_METRICS = [
-  'ORtg', 'Min', 'eFG', 'Poss', 'Shots', 'OR', 'DR', 'TO',
-  'ARate', 'Blk', 'FTRate', 'Stl', 'TS', 'FC40', 'FD40',
-  '2P', '3P', 'FT'
-];
-
-/**
- * Valid metrics for game attributes endpoint.
- */
-export const GAME_ATTRIB_METRICS = [
-  'Excitement', 'Tension', 'Dominance', 'ComeBack',
-  'FanMatch', 'Upsets', 'Busts'
-];
-
-/**
- * Valid conference codes.
- */
-export const CONFERENCES = [
-  'A10', 'ACC', 'AE', 'Amer', 'ASun', 'B10', 'B12', 'BE', 'BSky', 'BSth',
-  'BW', 'CAA', 'CUSA', 'Horz', 'Ivy', 'MAAC', 'MAC', 'MEast', 'MVC', 'MWC',
-  'NEC', 'OVC', 'Pac', 'Pat', 'SB', 'SC', 'SEC', 'Slnd', 'Sum', 'SWAC',
-  'WAC', 'WCC'
-];
-
-// ============================================================================
 // CREDENTIAL LOADING
 // ============================================================================
 
@@ -140,15 +136,14 @@ export const CONFERENCES = [
  * 1. Explicitly provided values
  * 2. Environment variables (KENPOM_EMAIL, KENPOM_PASSWORD)
  *
- * @param {Object} options - Optional credentials
- * @param {string} options.email - KenPom email
- * @param {string} options.password - KenPom password
- * @returns {{ email: string, password: string }} Credentials object
- * @throws {Error} If credentials are not found
+ * @param options - Optional credentials
+ * @returns Credentials object
+ * @throws Error if credentials are not found
  */
-export function getKenpomCredentials({ email = null, password = null } = {}) {
-  const resolvedEmail = email || process.env.KENPOM_EMAIL;
-  const resolvedPassword = password || process.env.KENPOM_PASSWORD;
+export function getKenpomCredentials(options: CredentialOptions = {}): KenpomCredentials {
+  const { email = null, password = null } = options;
+  const resolvedEmail = email ?? process.env.KENPOM_EMAIL;
+  const resolvedPassword = password ?? process.env.KENPOM_PASSWORD;
 
   if (!resolvedEmail) {
     throw new Error(
@@ -174,13 +169,13 @@ export function getKenpomCredentials({ email = null, password = null } = {}) {
 /**
  * Validate season against minimum year requirement.
  *
- * @param {number|string} season - Season year to validate
- * @param {string} endpoint - Endpoint name for error message
- * @throws {Error} If season is before minimum year
+ * @param season - Season year to validate
+ * @param endpoint - Endpoint name for error message
+ * @throws Error if season is before minimum year
  */
-export function validateSeason(season, endpoint) {
+export function validateSeason(season: number | string, endpoint: EndpointKey): void {
   const minYear = MIN_SEASONS[endpoint];
-  if (minYear && season && parseInt(season) < minYear) {
+  if (minYear !== undefined && season && parseInt(String(season)) < minYear) {
     throw new Error(
       `Season ${season} is before minimum year ${minYear} for ${endpoint}`
     );
@@ -190,11 +185,11 @@ export function validateSeason(season, endpoint) {
 /**
  * Validate player stats metric.
  *
- * @param {string} metric - Metric to validate
- * @throws {Error} If metric is invalid
+ * @param metric - Metric to validate
+ * @throws Error if metric is invalid
  */
-export function validatePlayerMetric(metric) {
-  if (!PLAYER_METRICS.includes(metric)) {
+export function validatePlayerMetric(metric: string): asserts metric is PlayerMetric {
+  if (!PLAYER_METRICS.includes(metric as PlayerMetric)) {
     throw new Error(
       `Invalid metric '${metric}'. Must be one of: ${PLAYER_METRICS.join(', ')}`
     );
@@ -204,11 +199,11 @@ export function validatePlayerMetric(metric) {
 /**
  * Validate game attribute metric.
  *
- * @param {string} metric - Metric to validate
- * @throws {Error} If metric is invalid
+ * @param metric - Metric to validate
+ * @throws Error if metric is invalid
  */
-export function validateGameAttribMetric(metric) {
-  if (!GAME_ATTRIB_METRICS.includes(metric)) {
+export function validateGameAttribMetric(metric: string): asserts metric is GameAttribMetric {
+  if (!GAME_ATTRIB_METRICS.includes(metric as GameAttribMetric)) {
     throw new Error(
       `Invalid metric '${metric}'. Must be one of: ${GAME_ATTRIB_METRICS.join(', ')}`
     );
@@ -218,11 +213,11 @@ export function validateGameAttribMetric(metric) {
 /**
  * Validate conference code.
  *
- * @param {string} conf - Conference code to validate
- * @throws {Error} If conference is invalid
+ * @param conf - Conference code to validate
+ * @throws Error if conference is invalid
  */
-export function validateConference(conf) {
-  if (conf && !CONFERENCES.includes(conf)) {
+export function validateConference(conf: string | null | undefined): asserts conf is Conference | null | undefined {
+  if (conf && !CONFERENCES.includes(conf as Conference)) {
     throw new Error(
       `Invalid conference '${conf}'. Must be one of: ${CONFERENCES.join(', ')}`
     );
@@ -233,26 +228,26 @@ export function validateConference(conf) {
  * Encode team name for URL.
  * Spaces become '+', '&' becomes '%26'.
  *
- * @param {string} team - Team name to encode
- * @returns {string} URL-encoded team name
+ * @param team - Team name to encode
+ * @returns URL-encoded team name
  */
-export function encodeTeamName(team) {
+export function encodeTeamName(team: string): string {
   return team.replace(/ /g, '+').replace(/&/g, '%26');
 }
 
 /**
  * Build URL with query parameters.
  *
- * @param {string} endpoint - Endpoint path
- * @param {Object} params - Query parameters
- * @returns {string} Full URL with query string
+ * @param endpoint - Endpoint path
+ * @param params - Query parameters
+ * @returns Full URL with query string
  */
-export function buildUrl(endpoint, params = {}) {
+export function buildUrl(endpoint: string, params: QueryParams = {}): string {
   const url = new URL(endpoint, BASE_URL);
 
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) {
-      url.searchParams.append(key, value);
+      url.searchParams.append(key, String(value));
     }
   }
 
@@ -266,7 +261,7 @@ export function buildUrl(endpoint, params = {}) {
 /**
  * Chrome-like headers for requests.
  */
-export const DEFAULT_HEADERS = {
+export const DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
   'Accept-Language': 'en-US,en;q=0.9',

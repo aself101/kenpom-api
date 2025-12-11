@@ -32,7 +32,7 @@ import {
   parseConferenceOffense,
   parseConferenceDefense,
   parseConferenceAggregateStats
-} from '../parsers.js';
+} from '../dist/parsers.js';
 
 // ============================================================================
 // HELPER FUNCTION TESTS
@@ -55,8 +55,9 @@ describe('stripSeed', () => {
   });
 
   it('should handle null/undefined', () => {
-    expect(stripSeed(null)).toBe(null);
-    expect(stripSeed(undefined)).toBe(undefined);
+    // TypeScript version returns empty string for null/undefined
+    expect(stripSeed(null)).toBe('');
+    expect(stripSeed(undefined)).toBe('');
   });
 
   it('should handle empty string', () => {
@@ -879,6 +880,64 @@ describe('parseFanMatch', () => {
     expect(result.games[0].PredictedPossessions).toBe(70);
     expect(result.games[0].Possessions).toBe('70'); // Uses predicted when actual missing
   });
+
+  it('should extract tournament label from game string', () => {
+    // Tournament is extracted from game string (e.g., "ACC-T" or "NCAA" suffix)
+    const htmlWithTournament = `
+      <table>
+        <thead>
+          <tr><th>Game</th><th>Prediction</th><th>Thrill Score</th><th>Come back</th><th>Excite ment</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 Duke 85, 25 UNC 78</td><td>Duke 82-75 (75%) [68]</td><td>95.5</td><td>85.2</td><td>90.1</td></tr>
+          <tr><td>2 Kansas 80, 15 Kentucky 72 ACC-T</td><td>Kansas 79-70 (60%) [65]</td><td>88.5</td><td>75.2</td><td>80.1</td></tr>
+          <tr><td>3 Auburn 75, 10 Tennessee 70 NCAA</td><td>Auburn 72-68 (55%)</td><td>92.0</td><td>80.0</td><td>85.0</td></tr>
+        </tbody>
+      </table>
+    `;
+    const result = parseFanMatch(htmlWithTournament);
+
+    expect(result.games).toHaveLength(3);
+    expect(result.games[0].Tournament).toBeNull();
+    expect(result.games[1].Tournament).toBe('ACC-T');
+    expect(result.games[2].Tournament).toBe('NCAA');
+  });
+
+  it('should extract possessions from game string', () => {
+    const htmlWithPoss = `
+      <table>
+        <thead>
+          <tr><th>Game</th><th>Prediction</th><th>Thrill Score</th><th>Come back</th><th>Excite ment</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 Duke 85, 25 UNC 78 [72]</td><td>Duke 82-75 (75%)</td><td>95.5</td><td>85.2</td><td>90.1</td></tr>
+        </tbody>
+      </table>
+    `;
+    const result = parseFanMatch(htmlWithPoss);
+
+    expect(result.games).toHaveLength(1);
+    expect(result.games[0].Possessions).toBe('72');
+  });
+
+  it('should parse alternate column name formats', () => {
+    const htmlAltCols = `
+      <table>
+        <thead>
+          <tr><th>Game</th><th>Prediction</th><th>ThrillScore</th><th>Comeback</th><th>Excitement</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 Duke 85, 25 UNC 78</td><td>Duke 82-75 (75%)</td><td>95.5·10</td><td>85.2·5</td><td>90.1·3</td></tr>
+        </tbody>
+      </table>
+    `;
+    const result = parseFanMatch(htmlAltCols);
+
+    expect(result.games).toHaveLength(1);
+    expect(result.games[0]['Thrill Score']).toBe('95.5');
+    expect(result.games[0]['Come back']).toBe('85.2');
+    expect(result.games[0]['Excite ment']).toBe('90.1');
+  });
 });
 
 // ============================================================================
@@ -1080,6 +1139,13 @@ describe('parseScoutingReport', () => {
     expect(result.OE).toBe('');
     expect(result['OE.Rank']).toBe('');
   });
+
+  // Note: The parseScoutingReport function uses highly specific regex patterns
+  // designed for actual KenPom HTML structure. The patterns like
+  // /function tableStart\(\) \{([^}]+)\}/ expect a specific inline JavaScript format
+  // that's difficult to replicate in test fixtures. Integration tests with real
+  // KenPom data would cover these code paths, but unit tests are limited to
+  // verifying the default structure and edge case handling.
 });
 
 // ============================================================================
